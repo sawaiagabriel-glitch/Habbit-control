@@ -1,0 +1,315 @@
+{% extends 'login_cadastro_app/base_auth.html' %} 
+{% load static %}
+
+{% block auth_title %}Cadastro de Cliente{% endblock %}
+
+{% block content %} 
+    <div class="form-header">
+        <h1 class="form-title">Criar Conta</h1>
+        <p class="form-subtitle">Preencha seus dados para começar a usar o Habit Control</p>
+    </div>
+
+    {# Exibição de Mensagens do Django - Notificações sobrepostas no topo #}
+    {% if messages %}
+        <div class="messages-toast-top">
+            {% for message in messages %}
+                {% if message.tags == 'error' %}
+                    <div class="message-toast-top message-toast-error" data-message-id="{{ forloop.counter }}">
+                        <svg class="message-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M12 8V12M12 16H12.01M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                        <span>{{ message }}</span>
+                    </div>
+                {% endif %}
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <form method="POST" class="registration-form" id="cadastroForm" novalidate>
+        {% csrf_token %}
+        
+        <!-- DADOS PESSOAIS E ACESSO -->
+        <div class="form-section">
+            <div class="section-header">
+                <div class="section-icon-wrapper">
+                    <svg class="section-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 12C14.7614 12 17 9.76142 17 7C17 4.23858 14.7614 2 12 2C9.23858 2 7 4.23858 7 7C7 9.76142 9.23858 12 12 12Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M20.59 22C20.59 18.13 16.74 15 12 15C7.26 15 3.41 18.13 3.41 22" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </div>
+                <h2 class="section-title">Dados Pessoais e Acesso</h2>
+            </div>
+            
+            <div class="form-grid">
+                {# Nome Completo #}
+                <div class="form-group">
+                    <label for="{{ form.nome_completo.id_for_label }}">
+                        {{ form.nome_completo.label }}
+                        <span class="required-indicator">*</span>
+                    </label>
+                    <div class="input-wrapper">
+                        <svg class="input-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M16 7C16 9.20914 14.2091 11 12 11C9.79086 11 8 9.20914 8 7C8 4.79086 9.79086 3 12 3C14.2091 3 16 4.79086 16 7Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            <path d="M12 14C8.13401 14 5 17.134 5 21H19C19 17.134 15.866 14 12 14Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                        {{ form.nome_completo }}
+                    </div>
+                    {% if form.nome_completo.errors %}
+                        <ul class="errorlist">
+                            {% for error in form.nome_completo.errors %}
+                                <li>{{ error }}</li>
+                            {% endfor %}
+                        </ul>
+                    {% endif %}
+                </div>
+
+                {# Idade #}
+                <div class="form-group">
+                    <label for="{{ form.idade.id_for_label }}">
+                        {{ form.idade.label }}
+                        <span class="required-indicator">*</span>
+                    </label>
+                    <div class="input-wrapper">
+                        <svg class="input-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M8 2V6M16 2V6M3 10H21M5 4H19C20.1046 4 21 4.89543 21 6V20C21 21.1046 20.1046 22 19 22H5C3.89543 22 3 21.1046 3 20V6C3 4.89543 3.89543 4 5 4Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                        {{ form.idade }}
+                    </div>
+                    {% if form.idade.errors %}
+                        <ul class="errorlist">
+                            {% for error in form.idade.errors %}
+                                <li>{{ error }}</li>
+                            {% endfor %}
+                        </ul>
+                    {% endif %}
+                </div>
+            </div>
+
+            {# CPF #}
+            <div class="form-group">
+                <label for="{{ form.cpf.id_for_label }}">
+                    {{ form.cpf.label }}
+                    <span class="required-indicator">*</span>
+                </label>
+                <div class="input-wrapper">
+                    <svg class="input-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M9 12H15M9 16H15M17 21H7C5.89543 21 5 20.1046 5 19V5C5 3.89543 5.89543 3 7 3H12.5858C12.851 3 13.1054 3.10536 13.2929 3.29289L18.7071 8.70711C18.8946 8.89464 19 9.149 19 9.41421V19C19 20.1046 18.1046 21 17 21Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                    {{ form.cpf }}
+                </div>
+                {% if form.cpf.errors %}
+                    <ul class="errorlist">
+                        {% for error in form.cpf.errors %}
+                            <li>{{ error }}</li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+            </div>
+
+            {# Email #}
+            <div class="form-group">
+                <label for="{{ form.email.id_for_label }}">
+                    {{ form.email.label }}
+                    <span class="required-indicator">*</span>
+                </label>
+                <div class="input-wrapper">
+                    <svg class="input-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M3 8L10.89 13.26C11.2187 13.4793 11.6049 13.5963 12 13.5963C12.3951 13.5963 12.7813 13.4793 13.11 13.26L21 8M5 19H19C20.1046 19 21 18.1046 21 17V7C21 5.89543 20.1046 5 19 5H5C3.89543 5 3 5.89543 3 7V17C3 18.1046 3.89543 19 5 19Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                    {{ form.email }}
+                </div>
+                {% if form.email.errors %}
+                    <ul class="errorlist">
+                        {% for error in form.email.errors %}
+                            <li>{{ error }}</li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+            </div>
+            
+            {# Senha COM TOGGLE #}
+            <div class="form-group password-toggle-group">
+                <label for="{{ form.password.id_for_label }}">
+                    {{ form.password.label }}
+                    <span class="required-indicator">*</span>
+                </label>
+                <div class="input-wrapper">
+                    <svg class="input-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M12 8V12M12 16H12.01" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                    {{ form.password }}
+                    <button type="button" id="togglePassword" class="password-toggle-btn" aria-label="Mostrar/Ocultar senha">
+                        <svg class="password-toggle-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path id="eye-open" d="M1 12S5 4 12 4C19 4 23 12 23 12M1 12S5 20 12 20C19 20 23 12 23 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            <path d="M12 12.5C13.3807 12.5 14.5 11.3807 14.5 10C14.5 8.61929 13.3807 7.5 12 7.5C10.6193 7.5 9.5 8.61929 9.5 10C9.5 11.3807 10.6193 12.5 12 12.5Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            <path id="eye-slash" d="M17.5 6.5L6.5 17.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: none;"/>
+                        </svg>
+                    </button>
+                </div>
+                {% if form.password.errors %}
+                    <ul class="errorlist">
+                        {% for error in form.password.errors %}
+                            <li>{{ error }}</li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- LOCALIZAÇÃO -->
+        <div class="form-section">
+            <div class="section-header">
+                <div class="section-icon-wrapper">
+                    <svg class="section-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 2C6.48 2 2 6.48 2 12C2 17.52 6.48 22 12 22C17.52 22 22 17.52 22 12C22 6.48 17.52 2 12 2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M12 6V12L16 14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </div>
+                <h2 class="section-title">Localização</h2>
+            </div>
+            
+            <div class="form-grid">
+                {# Estado #}
+                <div class="form-group estado-select-group">
+                    <label for="id_estado">Estado</label>
+                    <div class="input-wrapper">
+                        <svg class="input-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M21 10C21 17 12 23 12 23C12 23 3 17 3 10C3 7.61305 3.94821 5.32387 5.63604 3.63604C7.32387 1.94821 9.61305 1 12 1C14.3869 1 16.6761 1.94821 18.364 3.63604C20.0518 5.32387 21 7.61305 21 10Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            <path d="M12 13C13.6569 13 15 11.6569 15 10C15 8.34315 13.6569 7 12 7C10.3431 7 9 8.34315 9 10C9 11.6569 10.3431 13 12 13Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                        <select id="id_estado" name="estado" class="form-select">
+                            <option value="" disabled selected>Selecione o estado</option>
+                        </select>
+                        <svg class="select-arrow" width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M6 9L12 15L18 9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </div>
+                    {% if form.estado.errors %}
+                        <ul class="errorlist">
+                            {% for error in form.estado.errors %}
+                                <li>{{ error }}</li>
+                            {% endfor %}
+                        </ul>
+                    {% endif %}
+                </div>
+
+                {# Cidade #}
+                <div class="form-group cidade-select-group">
+                    <label for="id_cidade">Cidade</label>
+                    <div class="input-wrapper">
+                        <svg class="input-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            <path d="M2 17L12 22L22 17" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            <path d="M2 12L12 17L22 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                        <select id="id_cidade" name="cidade" class="form-select" disabled>
+                            <option value="" disabled selected>Selecione primeiro o estado</option>
+                        </select>
+                        <svg class="select-arrow" width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M6 9L12 15L18 9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </div>
+                    {% if form.cidade.errors %}
+                        <ul class="errorlist">
+                            {% for error in form.cidade.errors %}
+                                <li>{{ error }}</li>
+                            {% endfor %}
+                        </ul>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- PROFISSÃO -->
+        <div class="form-section">
+            <div class="section-header">
+                <div class="section-icon-wrapper">
+                    <svg class="section-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M20 7H4C2.9 7 2 7.9 2 9V19C2 20.1 2.9 21 4 21H20C21.1 21 22 20.1 22 19V9C22 7.9 21.1 7 20 7Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M16 7V5C16 3.9 15.1 3 14 3H10C8.9 3 8 3.9 8 5V7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </div>
+                <h2 class="section-title">Profissão</h2>
+            </div>
+            
+            <div class="form-group">
+                <label for="{{ form.profissao.id_for_label }}">Qual é sua profissão?</label>
+                <div class="input-wrapper">
+                    <svg class="input-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M20 7H4C2.9 7 2 7.9 2 9V19C2 20.1 2.9 21 4 21H20C21.1 21 22 20.1 22 19V9C22 7.9 21.1 7 20 7Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M16 7V5C16 3.9 15.1 3 14 3H10C8.9 3 8 3.9 8 5V7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                    {{ form.profissao }}
+                </div>
+                {% if form.profissao.errors %}
+                    <ul class="errorlist">
+                        {% for error in form.profissao.errors %}
+                            <li>{{ error }}</li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- CONSENTIMENTOS (LGPD) -->
+        <div class="form-section">
+            <div class="section-header">
+                <div class="section-icon-wrapper">
+                    <svg class="section-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M9 12L11 14L15 10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </div>
+                <h2 class="section-title">Consentimentos</h2>
+            </div>
+            
+            <div class="checkbox-group">
+                <label class="checkbox-label">
+                    {{ form.lgpd }}
+                    <span class="checkbox-custom"></span>
+                    <span class="checkbox-text">
+                        <strong>
+                            Aceito os 
+                            <a href="{% url 'consentimento' %}" target="_blank" class="link-lgpd">termos da Lei Geral de Proteção de Dados (LGPD)</a>
+                            <span class="required-indicator">*</span>
+                        </strong>
+                        <span class="checkbox-description">Concordo com o tratamento dos meus dados pessoais conforme a LGPD.</span>
+                    </span>
+                </label>
+                {% if form.lgpd.errors %}
+                    <ul class="errorlist">
+                        {% for error in form.lgpd.errors %}
+                            <li>{{ error }}</li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Submit Button -->
+        <button type="submit" class="btn-submit">
+            <span class="btn-text">Criar Conta</span>
+            <svg class="btn-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M5 12H19M19 12L12 5M19 12L12 19" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+        </button>
+        
+        {# Erros que não são de campo (non-field errors) #}
+        {% if form.non_field_errors %}
+            <div class="non-field-errors">
+                <ul class="errorlist">
+                    {% for error in form.non_field_errors %}
+                        <li>{{ error }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        {% endif %}
+    </form>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'login_cadastro_app/js/masks.js' %}"></script>
+<script src="{% static 'login_cadastro_app/js/estados_cidades.js' %}"></script>
+<script src="{% static 'login_cadastro_app/js/notifications.js' %}"></script>
+{% endblock %}

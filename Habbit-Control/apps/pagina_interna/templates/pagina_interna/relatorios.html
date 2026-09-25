@@ -1,0 +1,155 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Relatórios - Habit Control{% endblock %}
+
+{% block content %}
+<div class="dashboard-page">
+    <div class="page-header">
+        <h1 class="page-title">Relatórios</h1>
+        <p class="page-subtitle">Acompanhe seu progresso em relação aos objetivos</p>
+    </div>
+    
+    {% if habitos %}
+        <!-- Filtros -->
+        <div class="info-card relatorio-filters">
+            <div class="filters-content">
+                <div class="filter-group">
+                    <label for="habito_select" class="filter-label">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                        Selecionar Hábito
+                    </label>
+                    <select id="habito_select" class="filter-select">
+                        <option value="">Selecione um hábito</option>
+                        {% for habito in habitos %}
+                        <option value="{{ habito.id }}">{{ habito.nome_habito }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="filter-group">
+                    <label for="periodo_select" class="filter-label">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M8 2V6M16 2V6M3 10H21M5 4H19C20.1046 4 21 4.89543 21 6V20C21 21.1046 20.1046 22 19 22H5C3.89543 22 3 21.1046 3 20V6C3 4.89543 3.89543 4 5 4Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                        Período
+                    </label>
+                    <select id="periodo_select" class="filter-select">
+                        <option value="dia">Dia</option>
+                        <option value="semana" selected>Semana</option>
+                        <option value="mes">Mês</option>
+                        <option value="ano">Ano</option>
+                    </select>
+                </div>
+                
+                <button type="button" id="btn_gerar_relatorio" class="btn-gerar-relatorio" onclick="gerarRelatorio()">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M14 2H6C5.46957 2 4.96086 2.21071 4.58579 2.58579C4.21071 2.96086 4 3.46957 4 4V20C4 20.5304 4.21071 21.0391 4.58579 21.4142C4.96086 21.7893 5.46957 22 6 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V8L14 2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M14 2V8H20" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M16 13H8M16 17H8M10 9H8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                    Gerar Relatório
+                </button>
+            </div>
+        </div>
+        
+        <!-- Estatísticas -->
+        <div id="relatorio_stats" class="relatorio-stats" style="display: none;">
+            <div class="stat-card-relatorio">
+                <div class="stat-icon-relatorio stat-icon-registrado">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M9 12L11 14L15 10M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </div>
+                <div class="stat-content-relatorio">
+                    <div class="stat-label-relatorio">Registrado</div>
+                    <div class="stat-value-relatorio" id="stat_registrado">0</div>
+                </div>
+            </div>
+            
+            <div class="stat-card-relatorio">
+                <div class="stat-icon-relatorio stat-icon-esperado">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </div>
+                <div class="stat-content-relatorio">
+                    <div class="stat-label-relatorio">Esperado</div>
+                    <div class="stat-value-relatorio" id="stat_esperado">0</div>
+                </div>
+            </div>
+            
+            <div class="stat-card-relatorio">
+                <div class="stat-icon-relatorio stat-icon-progresso">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 2V6M12 18V22M6 12H2M22 12H18M19.07 19.07L16.24 16.24M19.07 4.93L16.24 7.76M4.93 19.07L7.76 16.24M4.93 4.93L7.76 7.76" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        <circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </div>
+                <div class="stat-content-relatorio">
+                    <div class="stat-label-relatorio">Progresso</div>
+                    <div class="stat-value-relatorio" id="stat_progresso">0%</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Gráfico -->
+        <div id="relatorio_chart_container" class="relatorio-chart-container" style="display: none;">
+            <div class="info-card">
+                <div class="chart-header">
+                    <h3 class="chart-title" id="chart_title">Gráfico de Progresso</h3>
+                    <div class="chart-subtitle" id="chart_subtitle"></div>
+                </div>
+                <div class="chart-wrapper">
+                    <canvas id="relatorioChart"></canvas>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Mensagem quando não há seleção -->
+        <div id="relatorio_empty" class="info-card empty-relatorio">
+            <div class="empty-relatorio-icon">
+                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M14 2H6C5.46957 2 4.96086 2.21071 4.58579 2.58579C4.21071 2.96086 4 3.46957 4 4V20C4 20.5304 4.21071 21.0391 4.58579 21.4142C4.96086 21.7893 5.46957 22 6 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V8L14 2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M14 2V8H20" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </div>
+            <h3 class="empty-relatorio-title">Selecione um hábito e período</h3>
+            <p class="empty-relatorio-text">Escolha um hábito e um período de tempo para visualizar seu relatório e gráfico de progresso.</p>
+        </div>
+    {% else %}
+        <div class="info-card empty-state">
+            <div class="empty-state-icon">
+                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M9 12L11 14L15 10M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </div>
+            <h3 class="empty-state-title">Nenhum hábito cadastrado ainda</h3>
+            <p class="empty-state-text">Cadastre hábitos para visualizar seus relatórios aqui!</p>
+            <a href="{% url 'cadastro_habito' %}" class="btn-empty-state">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 5V19M5 12H19" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                Cadastrar Primeiro Hábito
+            </a>
+        </div>
+    {% endif %}
+</div>
+
+{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'pagina_interna/css/style.css' %}">
+{% endblock %}
+
+{% block extra_js %}
+<!-- Chart.js CDN -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+    // Configuração de URLs para o JavaScript
+    window.API_DADOS_RELATORIO_URL = '{% url "api_dados_relatorio" %}';
+</script>
+<script src="{% static 'pagina_interna/js/relatorios.js' %}"></script>
+{% endblock %}

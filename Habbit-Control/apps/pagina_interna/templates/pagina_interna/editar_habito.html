@@ -1,0 +1,206 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Editar Hábito - Habit Control{% endblock %}
+
+{% block content %}
+<div class="dashboard-page">
+    <div class="page-header">
+        <h1 class="page-title">Editar Hábito</h1>
+        <p class="page-subtitle">Atualize as informações do seu hábito</p>
+    </div>
+    
+    {% if messages %}
+        <div class="messages-container">
+            {% for message in messages %}
+                <div class="message message-{{ message.tags }}">
+                    <svg class="message-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        {% if message.tags == 'success' %}
+                            <path d="M9 12L11 14L15 10M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        {% elif message.tags == 'error' %}
+                            <path d="M12 8V12M12 16H12.01M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        {% else %}
+                            <path d="M13 16H12V12H11M12 8H12.01M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        {% endif %}
+                    </svg>
+                    <span>{{ message }}</span>
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+    
+    <form method="POST" class="habito-form" id="editarHabitoForm">
+        {% csrf_token %}
+        
+        <!-- Seção: Tipo de Hábito -->
+        <div class="info-card">
+            <div class="section-header">
+                <svg class="section-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                <h2 class="section-title">Como você considera esse hábito?</h2>
+            </div>
+            
+            <div class="habito-tipo-options">
+                <label class="habito-tipo-option">
+                    <input type="radio" name="tipo_habito" value="positivo" class="habito-radio" {% if habito.tipo_habito == 'positivo' %}checked{% endif %} required>
+                    <div class="habito-option-content">
+                        <svg class="habito-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M20.84 4.61C20.3292 4.099 19.7228 3.69364 19.0554 3.41708C18.3879 3.14052 17.6725 2.99817 16.95 2.99817C16.2275 2.99817 15.5121 3.14052 14.8446 3.41708C14.1772 3.69364 13.5708 4.099 13.06 4.61L12 5.67L10.94 4.61C9.9083 3.57831 8.50903 2.99871 7.05 2.99871C5.59096 2.99871 4.19169 3.57831 3.16 4.61C2.1283 5.64169 1.54871 7.04097 1.54871 8.5C1.54871 9.95903 2.1283 11.3583 3.16 12.39L4.22 13.45L12 21.23L19.78 13.45L20.84 12.39C21.351 11.8792 21.7564 11.2728 22.0329 10.6054C22.3095 9.93789 22.4518 9.22248 22.4518 8.5C22.4518 7.77752 22.3095 7.0621 22.0329 6.39464C21.7564 5.72718 21.351 5.12075 20.84 4.61Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                        <span class="habito-option-text">Positivo</span>
+                    </div>
+                </label>
+                
+                <label class="habito-tipo-option">
+                    <input type="radio" name="tipo_habito" value="negativo" class="habito-radio" {% if habito.tipo_habito == 'negativo' %}checked{% endif %} required>
+                    <div class="habito-option-content">
+                        <svg class="habito-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M20.84 4.61C20.3292 4.099 19.7228 3.69364 19.0554 3.41708C18.3879 3.14052 17.6725 2.99817 16.95 2.99817C16.2275 2.99817 15.5121 3.14052 14.8446 3.41708C14.1772 3.69364 13.5708 4.099 13.06 4.61L12 5.67L10.94 4.61C9.9083 3.57831 8.50903 2.99871 7.05 2.99871C5.59096 2.99871 4.19169 3.57831 3.16 4.61C2.1283 5.64169 1.54871 7.04097 1.54871 8.5C1.54871 9.95903 2.1283 11.3583 3.16 12.39L4.22 13.45L12 21.23L19.78 13.45L20.84 12.39C21.351 11.8792 21.7564 11.2728 22.0329 10.6054C22.3095 9.93789 22.4518 9.22248 22.4518 8.5C22.4518 7.77752 22.3095 7.0621 22.0329 6.39464C21.7564 5.72718 21.351 5.12075 20.84 4.61Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            <path d="M15 9L9 15M9 9L15 15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                        <span class="habito-option-text">Negativo</span>
+                    </div>
+                </label>
+            </div>
+        </div>
+        
+        <!-- Seção: Nome do Hábito -->
+        <div class="info-card">
+            <div class="section-header">
+                <svg class="section-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M4 19.5C4 18.837 4.26339 18.2011 4.73223 17.7322C5.20107 17.2634 5.83696 17 6.5 17H20" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M16 7L12 3L8 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M12 3V15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                <h2 class="section-title">Nome do hábito</h2>
+            </div>
+            
+            <div class="form-group">
+                <input type="text" id="nome_habito" name="nome_habito" class="form-input" placeholder="Digite o nome do seu hábito ..." value="{{ habito.nome_habito }}" required>
+            </div>
+        </div>
+        
+        <!-- Seção: Frequência Atual -->
+        <div class="info-card">
+            <div class="section-header">
+                <svg class="section-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 2V6M12 18V22M6 12H2M22 12H18M19.07 19.07L16.24 16.24M19.07 4.93L16.24 7.76M4.93 19.07L7.76 16.24M4.93 4.93L7.76 7.76" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    <circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                <h2 class="section-title">Frequência atual</h2>
+            </div>
+            
+            <div class="frequencia-group">
+                <div class="form-group frequencia-input-group">
+                    <input type="number" id="frequencia_valor" name="frequencia_valor" class="form-input" placeholder="Digite a frequência do seu hábito ..." value="{{ habito.frequencia_atual_valor }}" min="0" required>
+                </div>
+                
+                <div class="form-group periodo-select-group">
+                    <select id="periodo" name="periodo" class="form-select" required>
+                        <option value="" disabled>Selecione o período</option>
+                        <option value="dia" {% if habito.frequencia_atual_periodo == 'dia' %}selected{% endif %}>Dia</option>
+                        <option value="semana" {% if habito.frequencia_atual_periodo == 'semana' %}selected{% endif %}>Semana</option>
+                        <option value="mes" {% if habito.frequencia_atual_periodo == 'mes' %}selected{% endif %}>Mês</option>
+                        <option value="ano" {% if habito.frequencia_atual_periodo == 'ano' %}selected{% endif %}>Ano</option>
+                    </select>
+                    <svg class="select-arrow" width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M6 9L12 15L18 9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Seção: Frequência Desejada -->
+        <div class="info-card">
+            <div class="section-header">
+                <svg class="section-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 2V6M12 18V22M6 12H2M22 12H18M19.07 19.07L16.24 16.24M19.07 4.93L16.24 7.76M4.93 19.07L7.76 16.24M4.93 4.93L7.76 7.76" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    <circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M12 8V12L14 14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                <h2 class="section-title">Frequência desejada</h2>
+            </div>
+            
+            <div class="frequencia-group">
+                <div class="form-group frequencia-input-group">
+                    <input type="number" id="frequencia_desejada_valor" name="frequencia_desejada_valor" class="form-input" placeholder="Digite a frequência desejada do seu hábito ..." value="{{ habito.frequencia_desejada_valor }}" min="0" required>
+                </div>
+                
+                <div class="form-group periodo-select-group">
+                    <select id="periodo_desejado" name="periodo_desejado" class="form-select" required>
+                        <option value="" disabled>Selecione o período</option>
+                        <option value="dia" {% if habito.frequencia_desejada_periodo == 'dia' %}selected{% endif %}>Dia</option>
+                        <option value="semana" {% if habito.frequencia_desejada_periodo == 'semana' %}selected{% endif %}>Semana</option>
+                        <option value="mes" {% if habito.frequencia_desejada_periodo == 'mes' %}selected{% endif %}>Mês</option>
+                        <option value="ano" {% if habito.frequencia_desejada_periodo == 'ano' %}selected{% endif %}>Ano</option>
+                    </select>
+                    <svg class="select-arrow" width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M6 9L12 15L18 9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Botões de Ação -->
+        <div class="form-actions">
+            <button type="button" class="btn-delete-habito" onclick="abrirModal()">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M3 6H5H21M8 6V4C8 3.46957 8.21071 2.96086 8.58579 2.58579C8.96086 2.21071 9.46957 2 10 2H14C14.5304 2 15.0391 2.21071 15.4142 2.58579C15.7893 2.96086 16 3.46957 16 4V6M19 6V20C19 20.5304 18.7893 21.0391 18.4142 21.4142C18.0391 21.7893 17.5304 22 17 22H7C6.46957 22 5.96086 21.7893 5.58579 21.4142C5.21071 21.0391 5 20.5304 5 20V6H19Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M10 11V17M14 11V17" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                <span>Excluir Hábito</span>
+            </button>
+            
+            <div class="form-actions-right">
+                <a href="{% url 'progressos' %}" class="btn-cancel-habito">
+                    <span>Cancelar</span>
+                </a>
+                <button type="submit" class="btn-submit-habito">
+                    <span>Salvar Alterações</span>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M5 12H19M19 12L12 5M19 12L12 19" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </form>
+    
+    <!-- Formulário oculto para exclusão -->
+    <form method="POST" id="deleteForm" style="display: none;">
+        {% csrf_token %}
+        <input type="hidden" name="excluir" value="1">
+    </form>
+</div>
+
+<!-- Modal de Confirmação de Exclusão -->
+<div id="modalExclusao" class="modal-overlay" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <svg class="modal-icon" width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 8V12M12 16H12.01M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <h2 class="modal-title">Confirmar Exclusão</h2>
+        </div>
+        <div class="modal-body">
+            <p class="modal-message">Tem certeza que deseja excluir o hábito <strong>"{{ habito.nome_habito }}"</strong>?</p>
+            <p class="modal-warning">Esta ação não pode ser desfeita.</p>
+        </div>
+        <div class="modal-actions">
+            <button type="button" class="btn-modal-cancel" onclick="fecharModal()">Cancelar</button>
+            <button type="button" class="btn-modal-confirm" onclick="confirmarExclusao()">Sim, Excluir</button>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'pagina_interna/css/style.css' %}">
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'pagina_interna/js/habitos.js' %}"></script>
+{% endblock %}
+
+

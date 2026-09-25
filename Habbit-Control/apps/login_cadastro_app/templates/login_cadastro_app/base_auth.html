@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Habit Control{% endblock %}</title>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'login_cadastro_app/css/style.css' %}">
+    {% block extra_css %}{% endblock %}
+</head>
+<body class="auth-body">
+    <div class="auth-container">
+        <div class="auth-card">
+            <!-- Logo -->
+            <div class="auth-logo">
+                <img src="{% static 'login_cadastro_app/img/habit_control_azul.jpg' %}" alt="Habit Control Logo">
+            </div>
+
+            <!-- Main Content -->
+            <div class="auth-content">
+
+                {% block content %}{% endblock %}
+            </div>
+
+            <!-- Footer Link -->
+            {% block footer %}
+            <div class="auth-footer">
+                <a href="{% url 'index' %}" class="back-link">Voltar para página principal</a>
+            </div>
+            {% endblock %}
+        </div>
+    </div>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

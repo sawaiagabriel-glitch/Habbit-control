@@ -1,0 +1,190 @@
+{% extends 'login_cadastro_app/base_auth.html' %} 
+{% load static %}
+
+{% block auth_title %}Acesso de Cliente{% endblock %}
+
+{% block content %} 
+    <div class="form-header">
+        <h1 class="form-title">Bem-vindo de volta!</h1>
+        <p class="form-subtitle">Entre com suas credenciais para acessar sua conta</p>
+    </div>
+
+    {# Exibição de Mensagens do Django - Não exibe mensagens de sucesso na página de login #}
+    {% if messages %}
+        <div class="messages-container">
+            {% for message in messages %}
+                {# Não exibe mensagens de sucesso (Bem-vindo, cadastro, logout) na página de login #}
+                {% if message.tags != 'success' %}
+                    <div class="message message-{{ message.tags }}">
+                        <svg class="message-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            {% if message.tags == 'error' %}
+                                <path d="M12 8V12M12 16H12.01M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            {% else %}
+                                <path d="M13 16H12V12H11M12 8H12.01M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            {% endif %}
+                        </svg>
+                        <span>{{ message }}</span>
+                    </div>
+                {% endif %}
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <form method="POST" class="login-form" id="loginForm" novalidate>
+        {% csrf_token %}
+        
+        {# Campo Email #}
+        <div class="form-group">
+            <label for="{{ form.email.id_for_label }}">
+                {{ form.email.label }}
+                <span class="required-indicator">*</span>
+            </label>
+            <div class="input-wrapper">
+                <svg class="input-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M3 8L10.89 13.26C11.2187 13.4793 11.6049 13.5963 12 13.5963C12.3951 13.5963 12.7813 13.4793 13.11 13.26L21 8M5 19H19C20.1046 19 21 18.1046 21 17V7C21 5.89543 20.1046 5 19 5H5C3.89543 5 3 5.89543 3 7V17C3 18.1046 3.89543 19 5 19Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                {{ form.email }}
+            </div>
+            {% if form.email.errors %}
+                <ul class="errorlist">
+                    {% for error in form.email.errors %}
+                        <li>{{ error }}</li>
+                    {% endfor %}
+                </ul>
+            {% endif %}
+        </div>
+        
+        {# Campo Senha COM TOGGLE #}
+        <div class="form-group password-toggle-group">
+            <label for="{{ form.password.id_for_label }}">
+                {{ form.password.label }}
+                <span class="required-indicator">*</span>
+            </label>
+            <div class="input-wrapper">
+                <svg class="input-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M12 8V12M12 16H12.01" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                {{ form.password }}
+                <button type="button" id="togglePassword" class="password-toggle-btn" aria-label="Mostrar/Ocultar senha">
+                    <svg class="password-toggle-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path id="eye-open" d="M1 12S5 4 12 4C19 4 23 12 23 12M1 12S5 20 12 20C19 20 23 12 23 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M12 12.5C13.3807 12.5 14.5 11.3807 14.5 10C14.5 8.61929 13.3807 7.5 12 7.5C10.6193 7.5 9.5 8.61929 9.5 10C9.5 11.3807 10.6193 12.5 12 12.5Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path id="eye-slash" d="M17.5 6.5L6.5 17.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: none;"/>
+                    </svg>
+                </button>
+            </div>
+            {% if form.password.errors %}
+                <ul class="errorlist">
+                    {% for error in form.password.errors %}
+                        <li>{{ error }}</li>
+                    {% endfor %}
+                </ul>
+            {% endif %}
+        </div>
+        
+        {# Erros que não são de campo (non-field errors) #}
+        {% if form.non_field_errors %}
+            <div class="non-field-errors">
+                <ul class="errorlist">
+                    {% for error in form.non_field_errors %}
+                        <li>{{ error }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        {% endif %}
+
+        {# Botão de Submit #}
+        <button type="submit" class="btn-submit">
+            <span class="btn-text">Entrar</span>
+            <svg class="btn-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M5 12H19M19 12L12 5M19 12L12 19" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+        </button>
+    </form>
+
+    {# Link para cadastro #}
+    <div class="auth-links">
+        <p class="auth-link-text">
+            Ainda não tem conta? 
+            <a href="{% url 'cadastro_cliente' %}" class="auth-link">Cadastre-se aqui</a>
+        </p>
+    </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const form = document.getElementById('loginForm');
+        const passwordInput = document.getElementById('id_password');
+        const togglePassword = document.getElementById('togglePassword');
+        const emailInput = document.getElementById('id_email');
+        
+        // 1. Toggle de visibilidade da senha
+        if (togglePassword && passwordInput) {
+            togglePassword.addEventListener('click', function(e) {
+                e.preventDefault();
+                const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+                passwordInput.setAttribute('type', type);
+                
+                const eyeSlash = document.getElementById('eye-slash');
+                const eyeOpen = document.getElementById('eye-open');
+                
+                if (type === 'text') {
+                    eyeSlash.style.display = 'block';
+                    eyeOpen.style.opacity = '0.3';
+                } else {
+                    eyeSlash.style.display = 'none';
+                    eyeOpen.style.opacity = '1';
+                }
+            });
+        }
+
+        // 2. Validação em tempo real de email
+        if (emailInput) {
+            emailInput.addEventListener('blur', function() {
+                const formGroup = this.closest('.form-group');
+                if (!formGroup) return;
+                
+                const errorList = formGroup.querySelector('.errorlist');
+                if (errorList) {
+                    errorList.remove();
+                }
+                
+                if (this.value.trim() === '') {
+                    formGroup.classList.remove('valid', 'invalid');
+                    return;
+                }
+                
+                const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                const isValid = emailRegex.test(this.value);
+                formGroup.classList.toggle('valid', isValid);
+                formGroup.classList.toggle('invalid', !isValid);
+            });
+        }
+
+        // 3. Feedback visual ao focar nos campos
+        if (form) {
+            const inputs = form.querySelectorAll('input');
+            inputs.forEach(input => {
+                input.addEventListener('focus', function() {
+                    this.closest('.form-group')?.classList.add('focused');
+                });
+                
+                input.addEventListener('blur', function() {
+                    this.closest('.form-group')?.classList.remove('focused');
+                });
+            });
+
+            // 4. Animação suave no submit
+            form.addEventListener('submit', function(e) {
+                const submitBtn = form.querySelector('.btn-submit');
+                if (submitBtn) {
+                    submitBtn.classList.add('loading');
+                    submitBtn.disabled = true;
+                }
+            });
+        }
+    });
+</script>
+{% endblock %}

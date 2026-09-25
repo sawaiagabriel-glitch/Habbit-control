@@ -1,0 +1,90 @@
+{% extends 'login_cadastro_app/base_auth.html' %}
+
+{% block title %}Consentimentos - Habit Control{% endblock %}
+
+{% block content %}
+<div class="form-header">
+    <h1 class="form-title">Política de Proteção de Dados</h1>
+    <p class="form-subtitle">Consentimento de tratamento de dados pessoais conforme a LGPD</p>
+</div>
+
+<div class="auth-separator"></div>
+
+<div class="form-section" style="max-height: 500px; overflow-y: auto; padding: 20px; background-color: #f8f9fa; border-radius: 8px; line-height: 1.8;">
+    <h3 style="color: #004B5E; margin-bottom: 15px; font-size: 1.1rem;">Lei Geral de Proteção de Dados (LGPD)</h3>
+    
+    <p style="margin-bottom: 15px; text-align: justify;">
+        A Habit Control respeita e protege os direitos relativos aos dados pessoais, em conformidade com a Lei nº 13.709, de 14 de agosto de 2018 - Lei Geral de Proteção de Dados (LGPD). Este documento explica como coletamos, utilizamos e protegemos suas informações.
+    </p>
+
+    <h4 style="color: #004B5E; margin-top: 20px; margin-bottom: 10px; font-size: 1rem;">1. Dados Coletados</h4>
+    <p style="margin-bottom: 15px; text-align: justify;">
+        Durante o processo de cadastro na Habit Control, coletamos as seguintes informações pessoais:
+        <br>• Nome completo
+        <br>• Idade
+        <br>• CPF
+        <br>• Email
+        <br>• Cidade e país de residência
+        <br>• Informações sobre profissão (opcional)
+    </p>
+
+    <h4 style="color: #004B5E; margin-top: 20px; margin-bottom: 10px; font-size: 1rem;">2. Finalidades da Coleta de Dados</h4>
+    <p style="margin-bottom: 15px; text-align: justify;">
+        Seus dados pessoais são coletados e utilizados com os seguintes propósitos:
+    </p>
+    
+    <p style="margin-bottom: 15px; text-align: justify;">
+        <strong>• Segurança da Plataforma:</strong> Os dados são utilizados para validar identidades, detectar atividades suspeitas e prevenir o acesso não autorizado à plataforma. Implementamos sistemas de proteção para evitar o acesso de bots e ataques automatizados, garantindo que apenas usuários legítimos possam utilizar nossos serviços.
+    </p>
+    
+    <p style="margin-bottom: 15px; text-align: justify;">
+        <strong>• Estudos Acadêmicos:</strong> Seus dados podem ser utilizados, de forma anonimizada e respeitando sua privacidade, para fins de pesquisa acadêmica e estudos científicos relacionados a segurança de dados, comportamento de usuários e desenvolvimento de tecnologias mais seguras. Esses estudos contribuem para melhorar continuamente a proteção de dados em toda a indústria.
+    </p>
+    
+    <p style="margin-bottom: 15px; text-align: justify;">
+        <strong>• Melhoria de Serviços:</strong> Utilizamos os dados para aprimorar a experiência do usuário, personalizar conteúdos e desenvolver novas funcionalidades.
+    </p>
+
+    <h4 style="color: #004B5E; margin-top: 20px; margin-bottom: 10px; font-size: 1rem;">3. Proteção de Dados</h4>
+    <p style="margin-bottom: 15px; text-align: justify;">
+        A Habit Control implementa medidas de segurança técnicas e administrativas para proteger seus dados contra acesso não autorizado, alteração, divulgação ou destruição. Todos os dados são armazenados em servidores seguros com criptografia de ponta a ponta.
+    </p>
+
+    <h4 style="color: #004B5E; margin-top: 20px; margin-bottom: 10px; font-size: 1rem;">4. Seus Direitos</h4>
+    <p style="margin-bottom: 15px; text-align: justify;">
+        Conforme a LGPD, você possui os seguintes direitos:
+        <br>• Acessar seus dados pessoais
+        <br>• Corrigir informações incompletas, inexatas ou desatualizadas
+        <br>• Solicitar a exclusão de seus dados
+        <br>• Revogar seu consentimento a qualquer momento
+        <br>• Receber seus dados em formato portável
+        <br>• Não ser sujeito a decisões automatizadas com efeitos legais
+    </p>
+
+    <h4 style="color: #004B5E; margin-top: 20px; margin-bottom: 10px; font-size: 1rem;">5. Compartilhamento de Dados</h4>
+    <p style="margin-bottom: 15px; text-align: justify;">
+        Seus dados pessoais não serão compartilhados com terceiros sem seu consentimento prévio, exceto quando exigido por lei ou por autoridades competentes. Para estudos acadêmicos, utilizamos dados anonimizados que não permitem sua identificação pessoal.
+    </p>
+
+    <h4 style="color: #004B5E; margin-top: 20px; margin-bottom: 10px; font-size: 1rem;">6. Contato e Dúvidas</h4>
+    <p style="margin-bottom: 15px; text-align: justify;">
+        Se você tiver dúvidas sobre esta política, desejar exercer seus direitos ou necessitar de mais informações, entre em contato conosco através de nossos canais de atendimento.
+    </p>
+
+    <p style="margin-top: 25px; padding-top: 15px; border-top: 1px solid #ddd; color: #666; font-size: 0.9rem;">
+        <strong>Última atualização:</strong> November 2025
+    </p>
+</div>
+
+{% endblock %}
+
+{% block footer %}
+<div class="auth-footer">
+    <div class="footer-links-row">
+        <a href="javascript:history.back()" class="back-link">Voltar para cadastro</a>
+        <a href="{% url 'index' %}" class="back-link">Voltar para página principal</a>
+    </div>
+</div>
+{% endblock %}
+
+

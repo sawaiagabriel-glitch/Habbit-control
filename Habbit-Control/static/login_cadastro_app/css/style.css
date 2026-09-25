@@ -1,0 +1,1972 @@
+/* Reset e configurações básicas */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    background-color: #F5F6F8;
+    color: #4A4A4A;
+    line-height: 1.6;
+    min-height: 100vh;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+
+/* Header */
+.header {
+    text-align: center;
+    margin-bottom: 60px;
+    position: relative;
+}
+
+.logo {
+    margin-bottom: 30px;
+}
+
+.logo img {
+    max-width: 200px;
+    height: auto;
+    border-radius: 16px;
+}
+
+.welcome-title {
+    font-size: 2.5rem;
+    font-weight: bold;
+    color: #4A4A4A;
+    margin-bottom: 10px;
+}
+
+.welcome-subtitle {
+    font-size: 1.1rem;
+    color: #A0A0A0;
+    margin-bottom: 20px;
+}
+
+/* Main Content */
+.main-content {
+    margin-bottom: 60px;
+}
+
+.cards-container {
+    display: flex;
+    gap: 30px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.card {
+    background: white;
+    border-radius: 12px;
+    padding: 50px 40px;
+    text-align: center;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    min-width: 350px;
+    max-width: 400px;
+}
+
+.card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+}
+
+.card-icon {
+    width: 60px;
+    height: 60px;
+    background-color: #F5F6F8;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 25px;
+}
+
+.card-title {
+    font-size: 1.3rem;
+    font-weight: 600;
+    color: #4A4A4A;
+    margin-bottom: 30px;
+}
+
+/* Buttons */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 12px 24px;
+    border-radius: 8px;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 1rem;
+    transition: all 0.3s ease;
+    border: none;
+    cursor: pointer;
+    min-width: 180px;
+}
+
+.btn-client {
+    background-color: #004B5E;
+    color: white;
+}
+
+.btn-client:hover {
+    background-color: #FF8C42;
+    transform: translateY(-2px);
+}
+
+.btn-revenda {
+    background-color: #004B5E;
+    color: white;
+}
+
+.btn-revenda:hover {
+    background-color: #FF8C42;
+    transform: translateY(-2px);
+}
+
+.btn-login {
+    background-color: #FF8C42;
+    color: white;
+    padding: 15px 30px;
+    font-size: 1.1rem;
+    min-width: 200px;
+}
+
+.btn-login:hover {
+    background-color: #E67E22;
+    transform: translateY(-2px);
+}
+
+/* Login Section */
+.login-section {
+    text-align: center;
+    width: 100%;
+    max-width: 600px;
+}
+
+.separator {
+    position: relative;
+    margin-bottom: 30px;
+}
+
+.separator::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background-color: #A0A0A0;
+    z-index: 1;
+}
+
+.separator-text {
+    background-color: #F5F6F8;
+    color: #A0A0A0;
+    padding: 0 20px;
+    position: relative;
+    z-index: 2;
+    font-size: 0.9rem;
+}
+
+.login-subtitle {
+    color: #A0A0A0;
+    font-size: 0.9rem;
+    margin-top: 15px;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .container {
+        padding: 15px;
+    }
+    
+    .welcome-title {
+        font-size: 2rem;
+    }
+    
+    .cards-container {
+        flex-direction: column;
+        align-items: center;
+    }
+    
+    .card {
+        min-width: 100%;
+        max-width: 400px;
+    }
+ }
+
+@media (max-width: 480px) {
+    .welcome-title {
+        font-size: 1.8rem;
+    }
+    
+    .welcome-subtitle {
+        font-size: 1rem;
+    }
+    
+    .card {
+        padding: 30px 20px;
+    }
+    
+    .btn {
+        min-width: 160px;
+        padding: 10px 20px;
+    }
+}
+
+/* ============================================
+   AUTHENTICATION PAGES STYLES
+   ============================================ */
+
+/* Auth Body with two-tone background */
+.auth-body {
+    background: linear-gradient(to bottom, #004B5E 0%, #004B5E 20%, #F5F6F8 20%, #F5F6F8 100%);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+
+/* Auth Container */
+.auth-container {
+    width: 100%;
+    max-width: 900px;
+    margin: 0 auto;
+}
+
+/* Auth Card */
+.auth-card {
+    background: white;
+    border-radius: 20px;
+    padding: 50px 60px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+    min-height: 600px;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Auth Logo */
+.auth-logo {
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+.auth-logo img {
+    max-width: 150px;
+    height: auto;
+    border-radius: 12px;
+}
+
+/* Auth Separator */
+.auth-separator {
+    height: 1px;
+    background-color: #E0E0E0;
+    margin-bottom: 40px;
+}
+
+/* Auth Content */
+.auth-content {
+    flex: 1;
+}
+
+/* Form Header */
+.form-header {
+    text-align: center;
+    margin-bottom: 40px;
+}
+
+.form-title {
+    font-size: 2rem;
+    font-weight: bold;
+    color: #004B5E;
+    margin-bottom: 10px;
+}
+
+.form-subtitle {
+    font-size: 1rem;
+    color: #A0A0A0;
+}
+
+/* Form Styles */
+.registration-form,
+.login-form {
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.form-section {
+    margin-bottom: 35px;
+}
+
+.section-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.section-icon {
+    flex-shrink: 0;
+}
+
+.section-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #4A4A4A;
+}
+
+/* Form Groups */
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-group label {
+    display: block;
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: #4A4A4A;
+    margin-bottom: 8px;
+}
+
+.form-group input,
+.form-group select {
+    width: 100%;
+    padding: 12px 16px;
+    border: 1px solid #E0E0E0;
+    border-radius: 8px;
+    font-size: 1rem;
+    color: #4A4A4A;
+    background-color: #F8F9FA;
+    transition: all 0.3s ease;
+}
+
+.form-group input:focus,
+.form-group select:focus {
+    outline: none;
+    border-color: #004B5E;
+    background-color: white;
+}
+
+.form-group input::placeholder {
+    color: #A0A0A0;
+}
+
+/* Input with Button */
+.input-with-button {
+    display: flex;
+    gap: 10px;
+}
+
+.input-with-button input {
+    flex: 1;
+}
+
+.btn-send-code {
+    padding: 12px 24px;
+    background-color: #004B5E;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 0.95rem;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.3s ease;
+}
+
+.btn-send-code:hover {
+    background-color: #FF8C42;
+}
+
+/* Checkbox Groups */
+.checkbox-group {
+    margin-bottom: 20px;
+}
+
+.checkbox-label {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    cursor: pointer;
+}
+
+.checkbox-label input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
+    margin-top: 2px;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.checkbox-text {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.checkbox-text strong {
+    font-size: 0.95rem;
+    color: #4A4A4A;
+    font-weight: 600;
+}
+
+.checkbox-description {
+    font-size: 0.85rem;
+    color: #A0A0A0;
+    line-height: 1.4;
+}
+
+/* Submit Button */
+.btn-submit {
+    width: 100%;
+    padding: 15px;
+    background-color: #004B5E;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 1.1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    margin-top: 20px;
+}
+
+.btn-submit:hover {
+    background-color: #FF8C42;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(229, 57, 53, 0.3);
+}
+
+/* Auth Footer */
+.auth-footer {
+    text-align: center;
+    margin-top: 30px;
+    padding-top: 20px;
+    border-top: 1px solid #E0E0E0;
+}
+
+.back-link {
+    color: #A0A0A0;
+    text-decoration: none;
+    font-size: 0.95rem;
+    transition: color 0.3s ease;
+}
+
+.back-link:hover {
+    color: #4A4A4A;
+}
+
+/* Consentimento page footer links row */
+.footer-links-row {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 24px;
+}
+
+/* Responsive Design for Auth Pages */
+@media (max-width: 768px) {
+    .auth-card {
+        padding: 40px 30px;
+        border-radius: 15px;
+    }
+    
+    .form-title {
+        font-size: 1.6rem;
+    }
+    
+    .input-with-button {
+        flex-direction: column;
+    }
+    
+    .btn-send-code {
+        width: 100%;
+    }
+}
+
+@media (max-width: 480px) {
+    .auth-card {
+        padding: 30px 20px;
+    }
+    
+    .form-title {
+        font-size: 1.4rem;
+    }
+    
+    .section-title {
+        font-size: 1rem;
+    }
+}
+
+/* ============================================
+   DASHBOARD LAYOUT STYLES
+   ============================================ */
+
+.dashboard-layout {
+    display: flex;
+    min-height: 100vh;
+    background-color: #F5F6F8;
+}
+
+/* Sidebar */
+.sidebar {
+    width: 280px;
+    background-color: #004B5E;
+    color: white;
+    padding: 30px 20px;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+}
+
+.sidebar-header {
+    text-align: center;
+    margin-bottom: 40px;
+}
+
+.sidebar-logo {
+    margin-bottom: 15px;
+    text-align: center;
+    background-color: #004B5E;
+    padding: 15px;
+    border-radius: 12px;
+}
+
+.sidebar-logo img {
+    max-width: 150px;
+    height: auto;
+    border-radius: 8px;
+    display: block;
+    margin: 0 auto;
+}
+
+.sidebar-separator {
+    width: 80%;
+    height: 1px;
+    background-color: rgba(255, 255, 255, 0.3);
+    margin: 15px auto 0;
+}
+
+.sidebar-nav {
+    flex: 1;
+}
+
+.sidebar-nav ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.sidebar-nav li {
+    margin-bottom: 10px;
+}
+
+.nav-item {
+    display: flex;
+    align-items: center;
+    padding: 12px 15px;
+    border-radius: 8px;
+    color: white;
+    text-decoration: none;
+    font-size: 1.05rem;
+    transition: background-color 0.3s ease;
+}
+
+.nav-item .nav-icon {
+    margin-right: 15px;
+}
+
+.nav-item:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+.nav-item.active {
+    background-color: #FF8C42;
+    font-weight: 600;
+    box-shadow: 0 4px 10px rgba(229, 57, 53, 0.3);
+}
+
+.sidebar-footer {
+    margin-top: auto;
+    padding-top: 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.logout-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 12px 15px;
+    border-radius: 8px;
+    color: white;
+    text-decoration: none;
+    font-size: 1.05rem;
+    transition: background-color 0.3s ease;
+}
+
+.logout-btn .logout-icon {
+    margin-right: 10px;
+}
+
+.logout-btn:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Main Content Area */
+.main-content {
+    flex: 1;
+    padding: 40px;
+    background-color: #F5F6F8;
+    overflow-y: auto;
+}
+
+.dashboard-page {
+    max-width: 1200px;
+}
+
+.page-title {
+    font-size: 2rem;
+    color: #333;
+    margin-bottom: 30px;
+    font-weight: 600;
+}
+
+/* Info Cards */
+.info-card {
+    background: white;
+    border-radius: 12px;
+    padding: 30px;
+    margin-bottom: 25px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.section-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 25px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid #E0E0E0;
+}
+
+.section-icon {
+    flex-shrink: 0;
+}
+
+.section-title {
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: #4A4A4A;
+    margin: 0;
+}
+
+/* Info Fields */
+.info-field {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px 0;
+    border-bottom: 1px solid #F0F0F0;
+}
+
+.info-field:last-child {
+    border-bottom: none;
+}
+
+.field-label {
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: #4A4A4A;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.edit-icon {
+    opacity: 0.6;
+    cursor: pointer;
+    transition: opacity 0.3s ease;
+}
+
+.edit-icon:hover {
+    opacity: 1;
+}
+
+.field-value {
+    font-size: 0.95rem;
+    color: #666;
+}
+
+/* Form Groups in Dashboard */
+.dashboard-page .form-group {
+    margin-bottom: 20px;
+}
+
+.dashboard-page .form-group label {
+    display: block;
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: #4A4A4A;
+    margin-bottom: 8px;
+}
+
+.dashboard-page .form-group input,
+.dashboard-page .form-group select {
+    width: 100%;
+    padding: 12px 16px;
+    border: 1px solid #E0E0E0;
+    border-radius: 8px;
+    font-size: 1rem;
+    color: #4A4A4A;
+    background-color: #F8F9FA;
+    transition: all 0.3s ease;
+}
+
+.dashboard-page .form-group input:focus,
+.dashboard-page .form-group select:focus {
+    outline: none;
+    border-color: #004B5E;
+    background-color: white;
+}
+
+/* Upload Section */
+.upload-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #4A4A4A;
+    margin-bottom: 20px;
+}
+
+.upload-area {
+    border: 2px dashed #D0D0D0;
+    border-radius: 12px;
+    padding: 60px 40px;
+    text-align: center;
+    background-color: #FAFAFA;
+    transition: all 0.3s ease;
+}
+
+.upload-area:hover {
+    border-color: #004B5E;
+    background-color: #F5F5F5;
+}
+
+.upload-icon {
+    margin: 0 auto 20px;
+    opacity: 0.6;
+}
+
+.upload-text-bold {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #4A4A4A;
+    margin-bottom: 8px;
+}
+
+.upload-text {
+    font-size: 0.95rem;
+    color: #A0A0A0;
+    margin-bottom: 20px;
+}
+
+.upload-btn {
+    padding: 12px 30px;
+    background-color: #E0E0E0;
+    color: #4A4A4A;
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.upload-btn:hover {
+    background-color: #D0D0D0;
+}
+
+/* Tabs */
+.tabs {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 25px;
+}
+
+.tab-btn {
+    padding: 12px 30px;
+    background-color: white;
+    color: #4A4A4A;
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.tab-btn:hover {
+    background-color: #F5F5F5;
+}
+
+.tab-btn.active {
+    background-color: #FF8C42;
+    color: white;
+    box-shadow: 0 4px 10px rgba(229, 57, 53, 0.3);
+}
+
+/* Table */
+.table-container {
+    background: white;
+    border-radius: 12px;
+    padding: 25px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    overflow-x: auto;
+}
+
+.warranty-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.warranty-table thead {
+    background-color: #F8F9FA;
+}
+
+.warranty-table th {
+    padding: 15px;
+    text-align: left;
+    font-weight: 600;
+    color: #4A4A4A;
+    font-size: 0.9rem;
+    border-bottom: 2px solid #E0E0E0;
+}
+
+.warranty-table td {
+    padding: 15px;
+    border-bottom: 1px solid #F0F0F0;
+    color: #666;
+    font-size: 0.95rem;
+}
+
+.warranty-table tbody tr:hover {
+    background-color: #F8F9FA;
+}
+
+/* Status Badges */
+.status-badge {
+    padding: 6px 16px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    display: inline-block;
+}
+
+.status-pendente {
+    background-color: #FFB300;
+    color: white;
+}
+
+.status-ativa {
+    background-color: #4CAF50;
+    color: white;
+}
+
+/* Responsive Design for Dashboard */
+@media (max-width: 1024px) {
+    .sidebar {
+        width: 240px;
+    }
+}
+
+@media (max-width: 768px) {
+    .dashboard-layout {
+        flex-direction: column;
+    }
+
+    .sidebar {
+        width: 100%;
+        padding: 20px;
+    }
+
+    .sidebar-header {
+        margin-bottom: 20px;
+    }
+
+    .sidebar-nav ul {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+
+    .sidebar-nav li {
+        margin: 0;
+    }
+
+    .nav-item {
+        padding: 10px 15px;
+        font-size: 0.95rem;
+    }
+
+    .main-content {
+        padding: 20px;
+    }
+
+    .page-title {
+        font-size: 1.6rem;
+    }
+
+    .info-card {
+        padding: 20px;
+    }
+
+    .warranty-table {
+        font-size: 0.85rem;
+    }
+
+    .warranty-table th,
+    .warranty-table td {
+        padding: 10px 8px;
+    }
+}
+
+/* ============================================
+   ADMIN PAGES STYLES
+   ============================================ */
+
+.admin-page {
+    padding: 20px;
+    background-color: #F5F5F5;
+    min-height: 100vh;
+}
+
+.page-header {
+    margin-bottom: 20px;
+}
+
+.page-title {
+    font-size: 28px;
+    font-weight: 600;
+    color: #333;
+    margin: 0;
+}
+
+.content-card {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+}
+
+.tabs-container {
+    border-bottom: 1px solid #E5E5E5;
+}
+
+.tabs {
+    display: flex;
+    margin: 0;
+    padding: 0;
+}
+
+.tab-button {
+    background: none;
+    border: none;
+    padding: 16px 24px;
+    font-size: 16px;
+    font-weight: 500;
+    color: #666;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+.tab-button.active {
+    background-color: #DC2626;
+    color: white;
+}
+
+.tab-button:hover:not(.active) {
+    background-color: #F5F5F5;
+    color: #333;
+}
+
+.table-container {
+    overflow-x: auto;
+}
+
+.warranty-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+}
+
+.warranty-table thead {
+    background-color: #F8F9FA;
+}
+
+.warranty-table th {
+    padding: 16px 12px;
+    text-align: left;
+    font-weight: 600;
+    color: #666;
+    border-bottom: 1px solid #E5E5E5;
+}
+
+.warranty-table th.details-column {
+    color: #DC2626;
+}
+
+.warranty-table td {
+    padding: 16px 12px;
+    border-bottom: 1px solid #F0F0F0;
+    vertical-align: middle;
+    text-align: left;
+}
+
+.warranty-table tbody tr:hover {
+    background-color: #F8F9FA;
+}
+
+.client-cell {
+    min-width: 200px;
+}
+
+.client-info {
+    display: flex;
+    flex-direction: column;
+}
+
+.client-name {
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 4px;
+}
+
+.client-email {
+    font-size: 12px;
+    color: #666;
+}
+
+.status-badge {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 500;
+    text-transform: uppercase;
+    text-align: center;
+}
+
+.status-badge.pending {
+    background-color: #FEF3C7;
+    color: #92400E;
+}
+
+.status-badge.active {
+    background-color: #D1FAE5;
+    color: #065F46;
+}
+
+.details-cell {
+    text-align: left;
+}
+
+.details-btn {
+    background-color: #DC2626;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+.details-btn:hover {
+    background-color: #B91C1C;
+}
+
+/* Simple details button styling */
+.details-btn {
+    background-color: #f8f9fa;
+    color: #495057;
+    border: 1px solid #dee2e6;
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: inline-block;
+    text-align: center;
+}
+
+.details-btn:hover {
+    background-color: #e9ecef;
+    border-color: #adb5bd;
+    color: #212529;
+}
+
+/* Responsive design for admin pages */
+@media (max-width: 768px) {
+    .admin-page {
+        padding: 10px;
+    }
+    
+    .warranty-table {
+        font-size: 12px;
+    }
+    
+    .warranty-table th,
+    .warranty-table td {
+        padding: 12px 8px;
+    }
+    
+    .client-cell {
+        min-width: 150px;
+    }
+}
+
+.status-negada {
+    background-color: #FF8C42; /* Mesma cor vermelha do btn-login */
+    color: white;
+}
+
+/* Estilos para edição de campos */
+.info-field.editable .edit-icon {
+    opacity: 0.5;
+    cursor: pointer;
+    transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.info-field.editable .edit-icon:hover {
+    opacity: 1;
+    transform: scale(1.1);
+}
+
+.edit-input {
+    padding: 8px 12px !important;
+    border: 1px solid #004B5E !important;
+    border-radius: 6px !important;
+    font-size: 0.95rem !important;
+    font-family: inherit !important;
+    color: #4A4A4A !important;
+    background-color: #fff !important;
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.edit-input:focus {
+    outline: none !important;
+    border-color: #004B5E !important;
+    box-shadow: 0 0 0 3px rgba(27, 95, 127, 0.1) !important;
+}
+
+.edit-input::placeholder {
+    color: #999;
+}
+
+/* ============================================
+   CADASTRO CLIENTE PAGE STYLES
+   ============================================ */
+
+/* Mensagens de feedback */
+.messages-container {
+    margin-bottom: 30px;
+}
+
+.message {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 18px;
+    border-radius: 10px;
+    margin-bottom: 12px;
+    font-size: 0.95rem;
+    animation: slideIn 0.3s ease-out;
+}
+
+.message-success {
+    background-color: #D1FAE5;
+    color: #065F46;
+    border-left: 4px solid #10B981;
+}
+
+.message-error {
+    background-color: #FEE2E2;
+    color: #991B1B;
+    border-left: 4px solid #EF4444;
+}
+
+.message-info {
+    background-color: #DBEAFE;
+    color: #1E40AF;
+    border-left: 4px solid #3B82F6;
+}
+
+.message-icon {
+    flex-shrink: 0;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Toast sobreposto para notificações */
+.messages-toast-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 9999;
+    max-width: 400px;
+}
+
+.message-toast {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px 20px;
+    border-radius: 12px;
+    margin-bottom: 12px;
+    font-size: 0.95rem;
+    font-weight: 500;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    animation: slideInFromRight 0.4s ease-out;
+    min-width: 300px;
+}
+
+.message-toast-success {
+    background-color: #D1FAE5;
+    color: #065F46;
+    border-left: 4px solid #10B981;
+}
+
+.message-toast-error {
+    background-color: #FEE2E2;
+    color: #991B1B;
+    border-left: 4px solid #EF4444;
+}
+
+.message-toast-info {
+    background-color: #DBEAFE;
+    color: #1E40AF;
+    border-left: 4px solid #3B82F6;
+}
+
+@keyframes slideInFromRight {
+    from {
+        opacity: 0;
+        transform: translateX(100%);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+/* Notificações sobrepostas no topo da página de cadastro */
+.messages-toast-top {
+    position: fixed;
+    top: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10000;
+    width: 100%;
+    max-width: 600px;
+    pointer-events: none;
+    padding: 0 20px;
+    box-sizing: border-box;
+}
+
+.message-toast-top {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px 20px;
+    border-radius: 12px;
+    margin: 0 auto 12px;
+    font-size: 0.95rem;
+    font-weight: 500;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+    animation: slideInFromTop 0.4s ease-out;
+    min-width: 300px;
+    pointer-events: auto;
+    transition: opacity 0.5s ease-out;
+}
+
+.message-toast-top.message-toast-error {
+    background-color: #FEE2E2;
+    color: #991B1B;
+    border-left: 4px solid #EF4444;
+}
+
+.message-toast-top.message-toast-success {
+    background-color: #D1FAE5;
+    color: #065F46;
+    border-left: 4px solid #10B981;
+}
+
+.message-toast-top.fade-out {
+    opacity: 0;
+}
+
+@keyframes slideInFromTop {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Indicador de campo obrigatório */
+.required-indicator {
+    color: #EF4444;
+    margin-left: 4px;
+    font-weight: 600;
+}
+
+/* Seções do formulário melhoradas */
+.registration-form .section-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 24px;
+    padding-bottom: 16px;
+    border-bottom: 2px solid #F0F0F0;
+}
+
+.section-icon-wrapper {
+    width: 40px;
+    height: 40px;
+    background: linear-gradient(135deg, #004B5E 0%, #006B8F 100%);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.section-icon-wrapper .section-icon {
+    color: white;
+    stroke: white;
+}
+
+.registration-form .section-title {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: #004B5E;
+    margin: 0;
+}
+
+/* Grid para campos lado a lado */
+.form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
+    margin-bottom: 20px;
+}
+
+/* Input wrapper com ícone */
+.input-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.input-icon {
+    position: absolute;
+    left: 16px;
+    color: #A0A0A0;
+    pointer-events: none;
+    z-index: 1;
+    transition: color 0.3s ease;
+}
+
+.registration-form .form-group input,
+.registration-form .form-group select:not(.form-select) {
+    padding-left: 48px !important;
+    transition: all 0.3s ease;
+}
+
+.form-group.focused .input-icon {
+    color: #004B5E;
+}
+
+.form-group.valid input {
+    border-color: #10B981;
+    background-color: #F0FDF4;
+}
+
+.form-group.invalid input {
+    border-color: #EF4444;
+    background-color: #FEF2F2;
+}
+
+/* Campo de senha melhorado */
+.password-toggle-group .input-wrapper {
+    position: relative;
+}
+
+.password-toggle-btn {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #A0A0A0;
+    transition: color 0.3s ease, transform 0.2s ease;
+    z-index: 2;
+}
+
+.password-toggle-btn:hover {
+    color: #004B5E;
+    transform: translateY(-50%) scale(1.1);
+}
+
+.password-toggle-icon {
+    width: 20px;
+    height: 20px;
+}
+
+.password-toggle-group input {
+    padding-right: 50px !important;
+}
+
+/* Checkbox melhorado */
+.registration-form .checkbox-label {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    cursor: pointer;
+    padding: 16px;
+    background-color: #F8F9FA;
+    border-radius: 12px;
+    border: 2px solid #E0E0E0;
+    transition: all 0.3s ease;
+}
+
+.registration-form .checkbox-label:hover {
+    background-color: #F0F4F8;
+    border-color: #004B5E;
+}
+
+.registration-form .checkbox-label input[type="checkbox"] {
+    display: none;
+}
+
+.checkbox-custom {
+    width: 24px;
+    height: 24px;
+    border: 2px solid #A0A0A0;
+    border-radius: 6px;
+    background-color: white;
+    position: relative;
+    flex-shrink: 0;
+    margin-top: 2px;
+    transition: all 0.3s ease;
+}
+
+.checkbox-label input[type="checkbox"]:checked + .checkbox-custom {
+    background-color: #004B5E;
+    border-color: #004B5E;
+}
+
+.checkbox-label input[type="checkbox"]:checked + .checkbox-custom::after {
+    content: '✓';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: white;
+    font-size: 16px;
+    font-weight: bold;
+}
+
+.link-lgpd {
+    color: #004B5E;
+    text-decoration: underline;
+    transition: color 0.3s ease;
+}
+
+.link-lgpd:hover {
+    color: #FF8C42;
+}
+
+/* Botão de submit melhorado */
+.registration-form .btn-submit {
+    position: relative;
+    overflow: hidden;
+    margin-top: 30px;
+    box-shadow: 0 4px 15px rgba(0, 75, 94, 0.2);
+}
+
+.registration-form .btn-submit:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 6px 20px rgba(0, 75, 94, 0.3);
+}
+
+.registration-form .btn-submit:active {
+    transform: translateY(-1px);
+}
+
+.btn-submit.loading {
+    pointer-events: none;
+    opacity: 0.7;
+}
+
+.btn-submit .btn-text {
+    display: inline-block;
+    margin-right: 8px;
+}
+
+.btn-submit .btn-icon {
+    display: inline-block;
+    vertical-align: middle;
+    transition: transform 0.3s ease;
+}
+
+.btn-submit:hover .btn-icon {
+    transform: translateX(4px);
+}
+
+/* Erros não relacionados a campos */
+.non-field-errors {
+    margin-top: 20px;
+    padding: 16px;
+    background-color: #FEE2E2;
+    border-radius: 10px;
+    border-left: 4px solid #EF4444;
+}
+
+.registration-form .errorlist {
+    list-style: none;
+    padding: 0;
+    margin: 8px 0 0 0;
+}
+
+.registration-form .errorlist li {
+    color: #EF4444;
+    font-size: 0.875rem;
+    padding: 6px 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.registration-form .errorlist li::before {
+    content: '⚠';
+    font-size: 0.875rem;
+}
+
+/* Responsividade para cadastro */
+@media (max-width: 768px) {
+    .form-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .registration-form .section-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+    }
+    
+    .section-icon-wrapper {
+        width: 36px;
+        height: 36px;
+    }
+    
+    .form-title {
+        font-size: 1.75rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .form-title {
+        font-size: 1.5rem;
+    }
+    
+    .registration-form .section-title {
+        font-size: 1.1rem;
+    }
+    
+    .registration-form .checkbox-label {
+        padding: 12px;
+    }
+}
+
+/* ============================================
+   LOGIN PAGE STYLES
+   ============================================ */
+
+/* Formulário de login */
+.login-form {
+    max-width: 500px;
+    margin: 0 auto;
+}
+
+.login-form .form-group {
+    margin-bottom: 24px;
+}
+
+.login-form .form-group label {
+    display: block;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #4A4A4A;
+    margin-bottom: 10px;
+}
+
+.login-form .input-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.login-form .input-icon {
+    position: absolute;
+    left: 16px;
+    color: #A0A0A0;
+    pointer-events: none;
+    z-index: 1;
+    transition: color 0.3s ease;
+}
+
+.login-form .form-group input {
+    width: 100%;
+    padding: 14px 16px 14px 48px;
+    border: 2px solid #E0E0E0;
+    border-radius: 10px;
+    font-size: 1rem;
+    color: #4A4A4A;
+    background-color: #F8F9FA;
+    transition: all 0.3s ease;
+}
+
+.login-form .form-group input:focus {
+    outline: none;
+    border-color: #004B5E;
+    background-color: white;
+    box-shadow: 0 0 0 4px rgba(0, 75, 94, 0.1);
+}
+
+.login-form .form-group input::placeholder {
+    color: #A0A0A0;
+}
+
+.login-form .form-group.focused .input-icon {
+    color: #004B5E;
+}
+
+.login-form .form-group.valid input {
+    border-color: #10B981;
+    background-color: #F0FDF4;
+}
+
+.login-form .form-group.invalid input {
+    border-color: #EF4444;
+    background-color: #FEF2F2;
+}
+
+/* Campo de senha no login */
+.login-form .password-toggle-group .input-wrapper {
+    position: relative;
+}
+
+.login-form .password-toggle-btn {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #A0A0A0;
+    transition: color 0.3s ease, transform 0.2s ease;
+    z-index: 2;
+}
+
+.login-form .password-toggle-btn:hover {
+    color: #004B5E;
+    transform: translateY(-50%) scale(1.1);
+}
+
+.login-form .password-toggle-group input {
+    padding-right: 50px !important;
+}
+
+/* Botão de submit no login */
+.login-form .btn-submit {
+    width: 100%;
+    padding: 16px;
+    background: linear-gradient(135deg, #004B5E 0%, #006B8F 100%);
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-size: 1.1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    margin-top: 10px;
+    box-shadow: 0 4px 15px rgba(0, 75, 94, 0.25);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.login-form .btn-submit:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0, 75, 94, 0.35);
+    background: linear-gradient(135deg, #006B8F 0%, #004B5E 100%);
+}
+
+.login-form .btn-submit:active {
+    transform: translateY(0);
+}
+
+.login-form .btn-submit.loading {
+    pointer-events: none;
+    opacity: 0.7;
+}
+
+.login-form .btn-submit .btn-icon {
+    transition: transform 0.3s ease;
+}
+
+.login-form .btn-submit:hover .btn-icon {
+    transform: translateX(4px);
+}
+
+/* Links de autenticação */
+.auth-links {
+    text-align: center;
+    margin-top: 30px;
+    padding-top: 25px;
+    border-top: 1px solid #E0E0E0;
+}
+
+.auth-link-text {
+    font-size: 0.95rem;
+    color: #666;
+    margin: 0;
+}
+
+.auth-link {
+    color: #004B5E;
+    text-decoration: none;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+.auth-link::after {
+    content: '';
+    position: absolute;
+    bottom: -2px;
+    left: 0;
+    width: 0;
+    height: 2px;
+    background-color: #FF8C42;
+    transition: width 0.3s ease;
+}
+
+.auth-link:hover {
+    color: #FF8C42;
+}
+
+.auth-link:hover::after {
+    width: 100%;
+}
+
+/* Erros no formulário de login */
+.login-form .errorlist {
+    list-style: none;
+    padding: 0;
+    margin: 8px 0 0 0;
+}
+
+.login-form .errorlist li {
+    color: #EF4444;
+    font-size: 0.875rem;
+    padding: 6px 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.login-form .errorlist li::before {
+    content: '⚠';
+    font-size: 0.875rem;
+}
+
+.login-form .non-field-errors {
+    margin-top: 20px;
+    padding: 16px;
+    background-color: #FEE2E2;
+    border-radius: 10px;
+    border-left: 4px solid #EF4444;
+}
+
+/* Responsividade para login */
+@media (max-width: 768px) {
+    .login-form {
+        max-width: 100%;
+    }
+    
+    .form-title {
+        font-size: 1.75rem;
+    }
+    
+    .form-subtitle {
+        font-size: 0.95rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .form-title {
+        font-size: 1.5rem;
+    }
+    
+    .login-form .form-group input {
+        padding: 12px 14px 12px 44px;
+        font-size: 0.95rem;
+    }
+    
+    .login-form .btn-submit {
+        padding: 14px;
+        font-size: 1rem;
+    }
+}
+
+/* ============================================
+   ESTADO E CIDADE SELECT STYLES
+   ============================================ */
+
+.estado-select-group,
+.cidade-select-group {
+    position: relative;
+}
+
+.estado-select-group .input-wrapper,
+.cidade-select-group .input-wrapper {
+    position: relative;
+}
+
+.form-select {
+    width: 100%;
+    padding: 14px 50px 14px 45px;
+    border: 2px solid #E0E0E0;
+    border-radius: 10px;
+    font-size: 1rem;
+    color: #4A4A4A;
+    background-color: #F8F9FA;
+    -webkit-appearance: none !important;
+    -moz-appearance: none !important;
+    appearance: none !important;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    background-image: none !important;
+    background-repeat: no-repeat;
+    background-position: right center;
+}
+
+/* Remove seta padrão no IE/Edge */
+.form-select::-ms-expand {
+    display: none !important;
+}
+
+/* Remove seta padrão no Firefox */
+.form-select {
+    text-indent: 0.01px;
+    text-overflow: '';
+}
+
+/* Garantir que não há seta padrão em nenhum navegador */
+.estado-select-group select,
+.cidade-select-group select,
+.estado-select-group .form-select,
+.cidade-select-group .form-select {
+    -webkit-appearance: none !important;
+    -moz-appearance: none !important;
+    appearance: none !important;
+    background-image: none !important;
+    background: #F8F9FA !important;
+    padding-left: 45px !important;
+    padding-right: 50px !important;
+}
+
+.estado-select-group select::-ms-expand,
+.cidade-select-group select::-ms-expand {
+    display: none !important;
+}
+
+.form-select:focus {
+    outline: none;
+    border-color: #004B5E;
+    background-color: white;
+    box-shadow: 0 0 0 4px rgba(0, 75, 94, 0.1);
+}
+
+.form-select:disabled {
+    background-color: #E8E8E8;
+    cursor: not-allowed;
+    color: #999;
+}
+
+.select-arrow {
+    position: absolute;
+    right: 16px;
+    top: 50%;
+    transform: translateY(-50%);
+    pointer-events: none;
+    color: #A0A0A0;
+    transition: transform 0.3s ease;
+    z-index: 1;
+}
+
+.form-select:focus + .select-arrow {
+    transform: translateY(-50%) rotate(180deg);
+    color: #004B5E;
+}
+
+
+

@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Habit Control - Bem-vindo</title>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'login_cadastro_app/css/style.css' %}">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="logo">
+                <img src="{% static 'login_cadastro_app/img/habit_control_azul.jpg' %}" alt="Habit Control Logo">
+            </div>
+            <p class="welcome-subtitle">Selecione uma das opções para continuar</p>
+        </header>
+
+        {# Exibição de Mensagens do Django - Apenas notificação de logout #}
+        {% for message in messages %}
+            {% if message.tags == 'success' %}
+                <div class="messages-toast-top">
+                    <div class="message-toast-top message-toast-success" data-message-id="{{ forloop.counter }}">
+                        <svg class="message-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M9 12L11 14L15 10M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                        <span>{{ message }}</span>
+                    </div>
+                </div>
+            {% endif %}
+        {% endfor %}
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <div class="cards-container">
+                <!-- Cliente Card -->
+                <div class="card">
+                    <div class="card-icon">
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M12 12C14.7614 12 17 9.76142 17 7C17 4.23858 14.7614 2 12 2C9.23858 2 7 4.23858 7 7C7 9.76142 9.23858 12 12 12Z" stroke="#4A4A4A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            <path d="M20.59 22C20.59 18.13 16.74 15 12 15C7.26 15 3.41 18.13 3.41 22" stroke="#4A4A4A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </div>
+                    <h3 class="card-title">Cadastra Conta</h3>
+                    <a href="{% url 'cadastro_cliente' %}" class="btn btn-client">Criar uma conta</a>
+                </div>
+
+                <!-- Login Card -->
+                <div class="card">
+                    <div class="card-icon">
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M15 3H19C19.5304 3 20.0391 3.21071 20.4142 3.58579C20.7893 3.96086 21 4.46957 21 5V19C21 19.5304 20.7893 20.0391 20.4142 20.4142C20.0391 20.7893 19.5304 21 19 21H15" stroke="#4A4A4A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            <path d="M10 17L15 12L10 7" stroke="#4A4A4A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            <path d="M15 12H3" stroke="#4A4A4A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </div>
+                    <h3 class="card-title">Entrar na Conta</h3>
+                    <a href="{% url 'login' %}" class="btn btn-client">Entrar na Conta</a>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // Auto-dismiss das notificações de sucesso com fade out
+        document.addEventListener('DOMContentLoaded', function() {
+            const successMessages = document.querySelectorAll('.message-toast-top.message-toast-success');
+            
+            successMessages.forEach(function(message, index) {
+                // Verifica se a mensagem contém "Bem-vindo" e remove se contiver
+                const messageText = message.querySelector('span').textContent;
+                if (messageText.includes('Bem-vindo') || messageText.includes('bem-vindo')) {
+                    message.remove();
+                    return;
+                }
+                
+                // Delay para iniciar o fade out (5 segundos)
+                setTimeout(function() {
+                    message.classList.add('fade-out');
+                    
+                    // Remove o elemento após a animação de fade out
+                    setTimeout(function() {
+                        message.remove();
+                    }, 500); // Tempo da animação de fade out
+                }, 5000 + (index * 200)); // 5 segundos + delay entre múltiplas mensagens
+            });
+        });
+    </script>
+</body>
+</html>
