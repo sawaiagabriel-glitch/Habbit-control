@@ -16,7 +16,7 @@ class Habito(models.Model):
         ('ano', 'Ano'),
     ]
     
-    # Relacionamento com Cliente através do CPF
+    # Relacionamento com Cliente
     cliente = models.ForeignKey(
         Cliente, 
         on_delete=models.CASCADE, 

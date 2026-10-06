@@ -94,7 +94,7 @@ function enterEditMode(field) {
                 // Ícone de olho normal (senha oculta)
                 eyeIcon.innerHTML = `
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#666" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8z"></path>
                         <circle cx="12" cy="12" r="3"></circle>
                     </svg>
                 `;
@@ -215,7 +215,6 @@ function extractFieldName(labelText) {
     const labelMap = {
         'nome completo': 'nome_completo',
         'idade': 'idade',
-        'cpf': 'cpf',
         'email': 'email',
         'senha': 'password',
         'cidade': 'cidade',
@@ -241,7 +240,6 @@ function saveToBackend(fieldName, value, field) {
     const fieldMap = {
         'nome_completo': 'nome_completo',
         'idade': 'idade',
-        'cpf': 'cpf',
         'email': 'email',
         'password': 'password',
         'cidade': 'cidade',

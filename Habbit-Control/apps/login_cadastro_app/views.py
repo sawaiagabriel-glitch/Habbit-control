@@ -21,40 +21,32 @@ def cadastro_cliente(request):
             try:
                 # Verifica se email já existe antes de salvar
                 email = form.cleaned_data.get('email')
-                cpf = form.cleaned_data.get('cpf')
+                if email:
+                    email = email.lower().strip()
                 
                 if Cliente.objects.filter(email=email).exists():
                     messages.error(request, 'Este email já está cadastrado. Por favor, use outro email ou faça login.')
                     return render(request, 'login_cadastro_app/cadastro_cliente.html', {'form': form})
                 
-                if Cliente.objects.filter(cpf=cpf).exists():
-                    messages.error(request, 'Este CPF já está cadastrado. Por favor, use outro CPF ou faça login.')
-                    return render(request, 'login_cadastro_app/cadastro_cliente.html', {'form': form})
-                
                 form.save()
                 return redirect('login')
             except IntegrityError as e:
-                # Erro de integridade (CPF ou email já existe) - exibe mensagem de erro
+                # Erro de integridade (email já existe) - exibe mensagem de erro
                 error_msg = str(e)
                 if 'email' in error_msg.lower() or 'unique constraint' in error_msg.lower():
                     messages.error(request, 'Este email já está cadastrado. Por favor, use outro email ou faça login.')
-                elif 'cpf' in error_msg.lower():
-                    messages.error(request, 'Este CPF já está cadastrado. Por favor, use outro CPF ou faça login.')
                 else:
-                    messages.error(request, 'Erro ao cadastrar. Este email ou CPF já está em uso.')
+                    messages.error(request, 'Erro ao cadastrar. Este email já está em uso.')
                 return render(request, 'login_cadastro_app/cadastro_cliente.html', {'form': form})
         
         else:
-            # Exibe mensagens de erro do formulário, incluindo email/CPF já existentes
+            # Exibe mensagens de erro do formulário, incluindo email já existente
             for field, errors in form.errors.items():
                 for error in errors:
                     error_lower = str(error).lower()
-                    # Verifica se é erro de email/CPF já existente
+                    # Verifica se é erro de email já existente
                     if 'email' in error_lower and ('já existe' in error_lower or 'already exists' in error_lower or 'unique' in error_lower):
                         messages.error(request, 'Este email já está cadastrado. Por favor, use outro email ou faça login.')
-                        continue
-                    if 'cpf' in error_lower and ('já existe' in error_lower or 'already exists' in error_lower or 'unique' in error_lower):
-                        messages.error(request, 'Este CPF já está cadastrado. Por favor, use outro CPF ou faça login.')
                         continue
                     
                     if field == '__all__':
@@ -75,10 +67,12 @@ def login(request):
         form = LoginForm(request.POST)
         if form.is_valid():
             email = form.cleaned_data.get('email')
+            if email:
+                email = email.lower().strip()
             password = form.cleaned_data.get('password')
             
             try:
-                # 1. Tenta encontrar o cliente pelo email
+                # 1. Tenta encontrar o cliente pelo email normalizado
                 cliente = Cliente.objects.get(email=email)
             except Cliente.DoesNotExist:
                 # Limpa mensagens antigas antes de renderizar

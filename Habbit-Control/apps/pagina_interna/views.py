@@ -539,7 +539,6 @@ def update_cliente(request):
         field_map = {
             'nome_completo': 'nome_completo',
             'idade': 'idade',
-            'cpf': 'cpf',
             'email': 'email',
             'password': 'password', # O JS manda 'password', o model tem 'password'
             'cidade': 'cidade',
@@ -560,7 +559,6 @@ def update_cliente(request):
                 return JsonResponse({'success': False, 'error': 'A senha não pode ser vazia'}, status=400)
             cliente.password = value
         else:
-
             setattr(cliente, model_field, value)
 
         # 4. Salvar

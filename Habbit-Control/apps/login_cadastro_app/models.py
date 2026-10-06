@@ -6,7 +6,6 @@ class Cliente(models.Model):
     # --- Dados Pessoais ---
     nome_completo = models.CharField(max_length=255, verbose_name="Nome Completo")
     idade = models.PositiveIntegerField(verbose_name="Idade")
-    cpf = models.CharField(max_length=14, unique=True, verbose_name="CPF")
     email = models.EmailField(unique=True, verbose_name="Email")
     
     # --- Senha do cliente (será armazenada como hash) ---
@@ -26,14 +25,16 @@ class Cliente(models.Model):
     data_criacao = models.DateTimeField(auto_now_add=True, verbose_name="Data de Criação")
     
     def __str__(self):
-        return f"{self.nome_completo} - {self.cpf}"
+        return f"{self.nome_completo} - {self.email}"
 
     # Método para verificar a senha
     def check_password(self, raw_password):
         return check_password(raw_password, self.password)
 
-    # Sobrescreve o save para hashear a senha se ela não estiver hasheada
+    # Sobrescreve o save para hashear a senha se ela não estiver hasheada e normalizar o email
     def save(self, *args, **kwargs):
+        if self.email:
+            self.email = self.email.lower().strip()
         # Verifica se a senha não está hasheada
         if not self.password.startswith('pbkdf2_sha256$'):
             self.password = make_password(self.password)
