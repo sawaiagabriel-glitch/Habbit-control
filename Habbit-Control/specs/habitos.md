@@ -98,3 +98,9 @@ WHEN an authenticated client requests `/api/dados_relatorio/` via HTTP GET with 
 - `apps/pagina_interna/views.py` (`relatorios`, `api_dados_relatorio`)
 - `apps/pagina_interna/templates/pagina_interna/relatorios.html`
 - `static/pagina_interna/js/relatorios.js`
+
+---
+
+## Metas e Sequências
+
+As especificações planejadas para metas por período, estados e sequências (`streak`) estão documentadas em [metas_e_sequencias.md](metas_e_sequencias.md).
