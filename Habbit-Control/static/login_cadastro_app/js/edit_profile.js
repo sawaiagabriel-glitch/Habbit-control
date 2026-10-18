@@ -218,8 +218,7 @@ function extractFieldName(labelText) {
         'email': 'email',
         'senha': 'password',
         'cidade': 'cidade',
-        'país': 'pais',
-        'pais': 'pais',
+        'estado': 'estado',
         'profissão': 'profissao',
         'profissao': 'profissao'
     };
@@ -243,7 +242,7 @@ function saveToBackend(fieldName, value, field) {
         'email': 'email',
         'password': 'password',
         'cidade': 'cidade',
-        'pais': 'pais',
+        'estado': 'estado',
         'profissao': 'profissao'
     };
     

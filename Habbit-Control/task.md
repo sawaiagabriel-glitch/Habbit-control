@@ -40,6 +40,45 @@
 - [ ] Criar testes de registros de atividades.
 - [ ] Criar testes das regras de progresso.
 
+## Metas
+
+
+
+- [ ] Criar model de Meta.
+- [ ] Vincular cada meta a um hábito.
+- [ ] Permitir definir quantidade mínima.
+- [ ] Permitir escolher período: dia, semana, mês ou ano.
+- [ ] Criar meta com estado inicial ativa.
+- [ ] Criar meta com streak inicial igual a 0.
+- [ ] Calcular progresso da meta.
+- [ ] Alterar estado para cumprida quando atingir a quantidade mínima.
+- [ ] Alterar estado para não cumprida quando o período terminar abaixo da meta.
+- [ ] Criar novo ciclo após o encerramento do período.
+- [ ] Testar regras de metas com TDD.
+
+## Streak
+
+- [ ] Incrementar streak quando um período for cumprido.
+- [ ] Zerar streak quando um período não for cumprido.
+- [ ] Garantir que o streak só seja atualizado no encerramento do período.
+- [ ] Criar testes para períodos consecutivos cumpridos.
+- [ ] Criar teste para quebra de sequência.
+
+## Parceiro de Acompanhamento
+
+- [ ] Criar segundo perfil de usuário.
+- [ ] Definir permissões do Parceiro de Acompanhamento.
+- [ ] Impedir que o parceiro edite hábitos do cliente.
+- [ ] Impedir que o parceiro altere dados pessoais do cliente.
+- [ ] Criar testes de autorização para o novo perfil.
+
+## Compartilhamento de Metas
+
+- [ ] Permitir que o cliente compartilhe uma meta com um parceiro.
+- [ ] Registrar o relacionamento entre cliente, parceiro e meta.
+- [ ] Permitir que o parceiro visualize metas compartilhadas.
+- [ ] Impedir acesso a metas não compartilhadas.
+- [ ] Criar testes para compartilhamento e controle de acesso.
 
 ##  Revisão Final
 
@@ -48,3 +87,4 @@
 - [ ] Executar os testes do sistema.
 - [ ] Revisar documentação.
 - [ ] Registrar evidências de funcionamento.
+

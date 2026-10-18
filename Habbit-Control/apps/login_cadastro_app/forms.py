@@ -10,6 +10,11 @@ class ClienteForm(forms.ModelForm):
         max_length=100,
         required=True
     )
+    lgpd = forms.BooleanField(
+        label="Aceitou Termos LGPD",
+        required=True,
+        error_messages={'required': 'Este campo é obrigatório.'}
+    )
     
     class Meta:
         model = Cliente

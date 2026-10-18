@@ -109,8 +109,8 @@ Cliente autenticado.
    - **Localização:** `cidade`, `estado`;
    - **Conta e Segurança:** `email`, `password` (exibida estritamente mascarada como `********`).
 3. A senha armazenada no banco de dados nunca deve ser transmitida para o template em texto plano nem em formato hash. O valor renderizado para o campo senha deve ser estaticamente `"********"`.
-4. Os campos `nome_completo`, `idade`, `profissao`, `email` e `senha` devem conter o elemento de gatilho de edição (`.edit-icon`).
-5. DECISÃO PENDENTE: No template `alterar_dados_cliente.html`, os campos `Cidade` e `Estado` contêm a classe CSS `editable`, porém não possuem o elemento visual `<svg class="edit-icon">`. Como o script `edit_profile.js` requer o `.edit-icon` para associar o ouvinte de clique, Cidade e Estado não podem ser editados na interface atual. Definir se o ícone de edição deve ser adicionado a esses campos no template ou se a classe `editable` deve ser removida deles.
+4. Os campos `nome_completo`, `idade`, `profissao`, `cidade`, `estado`, `email` e `senha` devem conter o elemento de gatilho de edição (`.edit-icon`).
+5. No template `alterar_dados_cliente.html`, os campos `Cidade` e `Estado` contêm a classe CSS `editable` e possuem o elemento visual `<svg class="edit-icon">`, permitindo sua edição na interface da mesma forma que os demais campos permitidos.
 
 **Fluxo principal:**
 1. O cliente autenticado requisita `/alterar_dados/` via HTTP GET.
@@ -225,7 +225,7 @@ Cliente autenticado.
 ### REQ-PERFIL-04 — Atualização de Dados via API Assíncrona
 
 **Descrição EARS:**  
-WHEN the frontend submits an asynchronous HTTP POST request to `/api/cliente/update/` containing a valid CSRF token, authenticated session, and JSON payload with `field` and `value`, IF the specified `field` belongs to the allowed whitelist (`nome_completo`, `idade`, `email`, `password`, `cidade`, `pais`, `profissao`), THEN THE SYSTEM SHALL assign the value to the `Cliente` model, execute `cliente.save()`, and respond with HTTP 200 JSON `{"success": true, "message": "Dados atualizados com sucesso"}`.
+WHEN the frontend submits an asynchronous HTTP POST request to `/api/cliente/update/` containing a valid CSRF token, authenticated session, and JSON payload with `field` and `value`, IF the specified `field` belongs to the allowed whitelist (`nome_completo`, `idade`, `email`, `password`, `cidade`, `estado`, `profissao`), THEN THE SYSTEM SHALL assign the value to the `Cliente` model, execute `cliente.save()`, and respond with HTTP 200 JSON `{"success": true, "message": "Dados atualizados com sucesso"}`.
 
 **Objetivo:**  
 Processar a gravação no banco de dados de alterações cadastrais unitárias enviadas pela interface de perfil de forma assíncrona.
@@ -240,7 +240,7 @@ Cliente autenticado.
 **Entradas:**
 | Campo | Tipo | Obrigatório | Restrições |
 |---|---|---|---|
-| `field` | String | Sim | Deve pertencer à lista branca: `'nome_completo'`, `'idade'`, `'email'`, `'password'`, `'cidade'`, `'pais'`, `'profissao'`. |
+| `field` | String | Sim | Deve pertencer à lista branca: `'nome_completo'`, `'idade'`, `'email'`, `'password'`, `'cidade'`, `'estado'`, `'profissao'`. |
 | `value` | Qualquer (string/número) | Sim | Não pode ser nulo (`None`). Pode ser string vazia para campos que permitem vazio, exceto senha. |
 
 **Regras de negócio:**
@@ -254,7 +254,7 @@ Cliente autenticado.
    - `'email'` -> `'email'`
    - `'password'` -> `'password'`
    - `'cidade'` -> `'cidade'`
-   - `'pais'` -> `'pais'`
+   - `'estado'` -> `'estado'`
    - `'profissao'` -> `'profissao'`
 6. Caso o campo não conste no `field_map`, a requisição é rejeitada conforme REQ-PERFIL-06.
 7. Caso o campo seja diferente de `'password'`, o sistema executa `setattr(cliente, model_field, value)`.
@@ -264,9 +264,9 @@ Cliente autenticado.
    {"success": true, "message": "Dados atualizados com sucesso"}
    ```
 10. Em caso de erro interno não tratado, o sistema captura a exceção e retorna HTTP 500 com `{"success": false, "error": "<mensagem do erro>"}`.
-11. NOTA TÉCNICA / DECISÃO PENDENTE:
-    - O campo `'pais'` consta na lista branca da view, mas o modelo `Cliente` não possui coluna `pais` no banco de dados. Ao receber esse campo, `setattr` cria um atributo transitório em memória e `cliente.save()` não persiste a informação em tabela. Definir se a coluna `pais` deve ser criada no modelo `Cliente` ou se `'pais'` deve ser substituído por `'estado'` no `field_map`.
-    - O campo `'estado'` existe no modelo `Cliente`, porém não está no `field_map`, impossibilitando sua atualização pela API.
+11. NOTA TÉCNICA / DECISÃO RESOLVIDA:
+    - O campo `'pais'` foi removido do `field_map` da view e do JS, pois não existe coluna `pais` no modelo `Cliente`.
+    - O campo `'estado'` foi adicionado ao `field_map`, permitindo sua atualização pela API e edição no perfil.
 
 **Fluxo principal:**
 1. O frontend envia requisição POST para `/api/cliente/update/` com headers `Content-Type: application/json` e `X-CSRFToken: <token>` e payload `{"field": "nome_completo", "value": "Gabriel Silva"}`.
@@ -406,12 +406,12 @@ Cliente autenticado ou agente externo.
 **Entradas:**
 | Campo | Tipo | Valor |
 |---|---|---|
-| `field` | String | Qualquer identificador não contido em `['nome_completo', 'idade', 'email', 'password', 'cidade', 'pais', 'profissao']` (ex.: `'id'`, `'data_criacao'`, `'lgpd'`, `'is_superuser'`, `'estado'`). |
+| `field` | String | Qualquer identificador não contido em `['nome_completo', 'idade', 'email', 'password', 'cidade', 'estado', 'profissao']` (ex.: `'id'`, `'data_criacao'`, `'lgpd'`, `'is_superuser'`, `'pais'`). |
 | `value` | Qualquer | Qualquer valor enviado. |
 
 **Regras de negócio:**
 1. Apenas os campos explicitamente mapeados no dicionário `field_map` da view `update_cliente` são permitidos:
-   - `nome_completo`, `idade`, `email`, `password`, `cidade`, `pais`, `profissao`.
+   - `nome_completo`, `idade`, `email`, `password`, `cidade`, `estado`, `profissao`.
 2. Se o valor recebido na chave `field` não for uma chave do `field_map`:
    - A operação de gravação deve ser bloqueada;
    - O sistema deve retornar status HTTP 400;
@@ -439,9 +439,9 @@ Cliente autenticado ou agente externo.
   THEN o código HTTP de resposta deve ser 400
   AND o JSON deve ser exatamente `{"success": false, "error": "Campo data_criacao não permitido"}`.
 - GIVEN um cliente autenticado
-  WHEN enviar POST para `/api/cliente/update/` com `{"field": "estado", "value": "RJ"}`
+  WHEN enviar POST para `/api/cliente/update/` com `{"field": "pais", "value": "Brasil"}`
   THEN o código HTTP de resposta deve ser 400
-  AND o JSON deve ser `{"success": false, "error": "Campo estado não permitido"}`.
+  AND o JSON deve ser `{"success": false, "error": "Campo pais não permitido"}`.
 
 **Casos-limite:**
 - Nomes de campos com caracteres especiais ou strings longas: rejeitados de forma idêntica com HTTP 400.

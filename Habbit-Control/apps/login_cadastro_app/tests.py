@@ -49,6 +49,35 @@ class ClienteFormTest(TestCase):
         self.assertIn('idade', form.fields)
         self.assertIn('email', form.fields)
         self.assertIn('password', form.fields)
+        self.assertIn('lgpd', form.fields)
+
+    def test_formulario_exige_lgpd(self):
+        form = ClienteForm()
+        self.assertTrue(form.fields['lgpd'].required)
+
+    def test_formulario_invalido_sem_lgpd(self):
+        data = {
+            'nome_completo': 'Maria Santos',
+            'idade': 22,
+            'email': 'maria@test.com',
+            'password': 'senhaSegura123',
+        }
+        form = ClienteForm(data=data)
+        self.assertFalse(form.is_valid())
+        self.assertIn('lgpd', form.errors)
+        self.assertIn('Este campo é obrigatório.', form.errors['lgpd'])
+
+    def test_formulario_invalido_lgpd_false(self):
+        data = {
+            'nome_completo': 'Maria Santos',
+            'idade': 22,
+            'email': 'maria@test.com',
+            'password': 'senhaSegura123',
+            'lgpd': False,
+        }
+        form = ClienteForm(data=data)
+        self.assertFalse(form.is_valid())
+        self.assertIn('lgpd', form.errors)
 
     def test_formulario_valido(self):
         data = {
@@ -61,6 +90,7 @@ class ClienteFormTest(TestCase):
         form = ClienteForm(data=data)
         self.assertTrue(form.is_valid(), form.errors)
         self.assertEqual(form.cleaned_data['email'], 'maria@test.com')
+        self.assertTrue(form.cleaned_data['lgpd'])
 
     def test_formulario_rejeita_email_duplicado(self):
         Cliente.objects.create(
@@ -107,6 +137,38 @@ class CadastroClienteViewTest(TestCase):
         cliente = Cliente.objects.get(email='carlos@gmail.com')
         self.assertEqual(cliente.nome_completo, 'Carlos Pereira')
         self.assertTrue(cliente.check_password('senhaForte@123'))
+        self.assertTrue(cliente.lgpd)
+
+    def test_post_cadastro_sem_lgpd_rejeitado(self):
+        data = {
+            'nome_completo': 'Sem Consentimento',
+            'idade': 25,
+            'email': 'sem_lgpd@test.com',
+            'password': 'senhaForte@123',
+        }
+        total_antes = Cliente.objects.count()
+        response = self.client.post(self.cadastro_url, data)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(Cliente.objects.count(), total_antes)
+        self.assertFalse(Cliente.objects.filter(email='sem_lgpd@test.com').exists())
+        form = response.context['form']
+        self.assertIn('lgpd', form.errors)
+
+    def test_post_cadastro_lgpd_false_rejeitado(self):
+        data = {
+            'nome_completo': 'Consentimento False',
+            'idade': 25,
+            'email': 'lgpd_false@test.com',
+            'password': 'senhaForte@123',
+            'lgpd': False,
+        }
+        total_antes = Cliente.objects.count()
+        response = self.client.post(self.cadastro_url, data)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(Cliente.objects.count(), total_antes)
+        self.assertFalse(Cliente.objects.filter(email='lgpd_false@test.com').exists())
+        form = response.context['form']
+        self.assertIn('lgpd', form.errors)
 
     def test_post_cadastro_email_duplicado(self):
         Cliente.objects.create(

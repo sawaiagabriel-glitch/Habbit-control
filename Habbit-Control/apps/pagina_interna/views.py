@@ -542,7 +542,7 @@ def update_cliente(request):
             'email': 'email',
             'password': 'password', # O JS manda 'password', o model tem 'password'
             'cidade': 'cidade',
-            'pais': 'pais',
+            'estado': 'estado',
             'profissao': 'profissao'
         }
 
@@ -572,3 +572,4 @@ def update_cliente(request):
     except Exception as e:
         print(f"[ERRO CRÍTICO] {str(e)}")
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
