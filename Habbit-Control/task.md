@@ -5,9 +5,9 @@
 - [x] Criar spec.md.
 - [x] Criar plan.md.
 - [x] Criar tasks.md.
-- [ ] Criar pasta docs.
-- [ ] Criar registros ADR.
-- [ ] Documentar segurança e SSDLC.
+- [x] Criar pasta docs.
+- [x] Criar registros ADR.
+- [x] Documentar segurança e SSDLC.
 - [ ] Documentar estratégia de testes.
 - [ ] Criar documentação de revisão em docs/review.
 
@@ -35,7 +35,7 @@
 
 ##  Testes
 
-- [ ] Criar testes de autenticação.
+- [x] Criar testes de autenticação.
 - [ ] Criar testes de hábitos.
 - [ ] Criar testes de registros de atividades.
 - [ ] Criar testes das regras de progresso.

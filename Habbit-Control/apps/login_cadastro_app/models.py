@@ -15,9 +15,6 @@ class Cliente(models.Model):
     estado = models.CharField(max_length=2, verbose_name="Estado", blank=True, null=True)
     cidade = models.CharField(max_length=100, verbose_name="Cidade", blank=True, null=True) 
     
-    # --- Profissão ---
-    profissao = models.CharField(max_length=100, blank=True, null=True, verbose_name="Profissão")
-    
     # --- Consentimentos ---
     lgpd = models.BooleanField(default=False, verbose_name="Aceitou Termos LGPD")
     

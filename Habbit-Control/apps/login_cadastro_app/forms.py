@@ -18,7 +18,7 @@ class ClienteForm(forms.ModelForm):
     
     class Meta:
         model = Cliente
-        fields = ['nome_completo', 'idade', 'email', 'password', 'estado', 'cidade', 'profissao', 'lgpd']
+        fields = ['nome_completo', 'idade', 'email', 'password', 'estado', 'cidade', 'lgpd']
         
         widgets = {
             'nome_completo': forms.TextInput(attrs={'placeholder': 'Seu nome completo'}),

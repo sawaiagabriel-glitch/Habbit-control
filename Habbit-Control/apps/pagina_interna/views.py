@@ -3,7 +3,8 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
-from django.views.decorators.csrf import csrf_exempt
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError
 import json
 from apps.login_cadastro_app.models import Cliente 
 
@@ -555,9 +556,18 @@ def update_cliente(request):
 
         # 3. Lógica Especial para Senha
         if model_field == 'password':
-            if not value:
+            if not value or not str(value).strip():
                 return JsonResponse({'success': False, 'error': 'A senha não pode ser vazia'}, status=400)
-            cliente.password = value
+            raw_password = str(value)
+            try:
+                validate_password(raw_password, user=cliente)
+            except ValidationError as e:
+                return JsonResponse({
+                    'success': False,
+                    'error': '; '.join(e.messages),
+                    'errors': list(e.messages)
+                }, status=400)
+            cliente.password = raw_password
         else:
             setattr(cliente, model_field, value)
 
@@ -572,4 +582,3 @@ def update_cliente(request):
     except Exception as e:
         print(f"[ERRO CRÍTICO] {str(e)}")
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
-
