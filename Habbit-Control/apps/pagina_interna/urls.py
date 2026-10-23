@@ -1,5 +1,5 @@
 from django.urls import path
-from . import views
+from . import meta_views, views
 
 urlpatterns = [
     path('alterar_dados/', views.alterar_dados, name='alterar_dados'),
@@ -9,6 +9,9 @@ urlpatterns = [
     path('progressos/', views.progressos, name='progressos'),
     path('atividade_diaria/', views.atividade_diaria, name='atividade_diaria'),
     path('relatorios/', views.relatorios, name='relatorios'),
+    path('metas/', meta_views.metas, name='metas'),
+    path('metas/<int:meta_id>/excluir/', meta_views.excluir_meta, name='excluir_meta'),
+    path('parceiro/metas/', meta_views.metas_partilhadas, name='metas_partilhadas'),
     path('editar_habito/<int:habito_id>/', views.editar_habito, name='editar_habito'),
     path('api/cliente/update/', views.update_cliente, name='update_cliente'),
     path('api/registrar_atividade/', views.registrar_atividade, name='registrar_atividade'),

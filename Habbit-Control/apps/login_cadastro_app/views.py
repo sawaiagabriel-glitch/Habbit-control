@@ -87,6 +87,7 @@ def login(request):
                 storage.used = True
                 
                 # Autenticação bem-sucedida 
+                request.session.flush()
                 request.session['cliente_email'] = cliente.email
                 messages.success(request, f'Bem-vindo(a), {cliente.nome_completo.split()[0]}!')
                 
@@ -114,8 +115,8 @@ def login(request):
 
 # Lógica de Logout 
 def logout_view(request):
-    if 'cliente_email' in request.session:
-        del request.session['cliente_email']
+    if 'cliente_email' in request.session or 'parceiro_email' in request.session:
+        request.session.flush()
         messages.success(request, 'Logout realizado com sucesso!')
     else:
         messages.info(request, 'Você não estava logado.')

@@ -3,6 +3,7 @@ from .models import Cliente
 
 
 class ClienteForm(forms.ModelForm):
+    """Formulário de cadastro do Cliente, incluindo profissão e consentimento."""
     # Sobrescreve o campo Senha para usar o Widget de Senha (oculta o texto)
     password = forms.CharField(
         label="Senha",
@@ -18,11 +19,21 @@ class ClienteForm(forms.ModelForm):
     
     class Meta:
         model = Cliente
-        fields = ['nome_completo', 'idade', 'email', 'password', 'estado', 'cidade', 'lgpd']
+        fields = [
+            'nome_completo',
+            'idade',
+            'email',
+            'password',
+            'estado',
+            'cidade',
+            'profissao',
+            'lgpd',
+        ]
         
         widgets = {
             'nome_completo': forms.TextInput(attrs={'placeholder': 'Seu nome completo'}),
             'email': forms.EmailInput(attrs={'placeholder': 'seu.email@exemplo.com'}),
+            'profissao': forms.TextInput(attrs={'placeholder': 'Informe sua profissão'}),
         }
 
     def clean_email(self):

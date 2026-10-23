@@ -1,6 +1,7 @@
 from django.test import TestCase, Client
 from django.urls import reverse
 from django.db import IntegrityError
+from django.test import SimpleTestCase
 from apps.login_cadastro_app.models import Cliente
 from apps.login_cadastro_app.forms import ClienteForm, LoginForm
 
@@ -50,6 +51,7 @@ class ClienteFormTest(TestCase):
         self.assertIn('email', form.fields)
         self.assertIn('password', form.fields)
         self.assertIn('lgpd', form.fields)
+        self.assertIn('profissao', form.fields)
 
     def test_formulario_exige_lgpd(self):
         form = ClienteForm()
@@ -123,6 +125,51 @@ class CadastroClienteViewTest(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertNotContains(response, '000.000.000-00')
         self.assertNotContains(response, 'id_cpf')
+        self.assertContains(response, 'id_profissao')
+
+    def test_cadastro_com_csrf_profissao_login_e_perfil(self):
+        client = Client(enforce_csrf_checks=True)
+        response_cadastro = client.get(self.cadastro_url)
+        self.assertEqual(response_cadastro.status_code, 200)
+        csrf_cookie = response_cadastro.cookies['csrftoken']
+        self.assertFalse(csrf_cookie['secure'])
+        self.assertEqual(csrf_cookie['samesite'], 'Lax')
+
+        response = client.post(self.cadastro_url, {
+            'csrfmiddlewaretoken': csrf_cookie.value,
+            'nome_completo': 'Carla Profissional',
+            'idade': 32,
+            'email': 'carla@exemplo.com',
+            'password': 'SenhaSegura#2026',
+            'profissao': 'Arquiteta',
+            'lgpd': 'on',
+        })
+        self.assertRedirects(response, reverse('login'))
+
+        cliente = Cliente.objects.get(email='carla@exemplo.com')
+        self.assertEqual(cliente.profissao, 'Arquiteta')
+
+        response_login_form = client.get(reverse('login'))
+        csrf_token = response_login_form.cookies['csrftoken'].value
+        response_login = client.post(reverse('login'), {
+            'csrfmiddlewaretoken': csrf_token,
+            'email': cliente.email,
+            'password': 'SenhaSegura#2026',
+        })
+        self.assertRedirects(response_login, reverse('alterar_dados'))
+        response_perfil = client.get(reverse('alterar_dados'))
+        self.assertEqual(response_perfil.status_code, 200)
+        self.assertContains(response_perfil, 'Arquiteta')
+
+        response_update = client.post(
+            reverse('update_cliente'),
+            data='{"field":"profissao","value":"Urbanista"}',
+            content_type='application/json',
+            HTTP_X_CSRFTOKEN=csrf_token,
+        )
+        self.assertEqual(response_update.status_code, 200)
+        cliente.refresh_from_db()
+        self.assertEqual(cliente.profissao, 'Urbanista')
 
     def test_post_cadastro_sucesso(self):
         data = {
@@ -233,3 +280,18 @@ class LoginViewTest(TestCase):
         })
         self.assertEqual(response.status_code, 200)
         self.assertNotIn('cliente_email', self.client.session)
+
+
+class CookieSecuritySettingsTest(SimpleTestCase):
+    """Verifica a política de cookies para desenvolvimento e produção."""
+    def test_cookies_permanecem_compativeis_com_http_local(self):
+        from habit_control.settings import resolve_secure_cookies
+
+        self.assertFalse(resolve_secure_cookies(True, None))
+        self.assertFalse(resolve_secure_cookies(True, 'false'))
+
+    def test_cookies_de_producao_exigem_https_e_samesite_none(self):
+        from habit_control.settings import resolve_secure_cookies
+
+        self.assertTrue(resolve_secure_cookies(False, None))
+        self.assertTrue(resolve_secure_cookies(True, 'true'))

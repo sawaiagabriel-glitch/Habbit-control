@@ -1,10 +1,11 @@
 # Especificação: Metas e Sequências (Streak)
 
 ## Status do Módulo
-**NÃO IMPLEMENTADO** — Funcionalidade planejada para implementação futura orientada por desenvolvimento orientado a testes (TDD).
+**Implementada** — Metas, ciclos de calendário, estados, progresso, timestamp de cumprimento e streak são persistidos. O comando `atualizar_ciclos_metas` fecha ciclos vencidos e pode ser agendado diariamente.
 
 ## Visão Geral do Módulo
 O módulo de metas e sequências permite que os clientes estabeleçam alvos objetivos de frequência para seus hábitos dentro de intervalos padronizados (`dia`, `semana`, `mes`, `ano`). O sistema avalia deterministicamente o cumprimento da meta através do somatório de atividades registradas no intervalo temporal, gerenciando transições de estado da meta (`ativa`, `cumprida`, `não cumprida`) e mantendo o histórico de períodos consecutivos bem-sucedidos através de um contador de sequência (`streak`).
+Cada `Meta` pertence a um hábito positivo e conserva os ciclos avaliados em `MetaCiclo`.
 
 ---
 
@@ -86,9 +87,8 @@ Cliente autenticado (titular do hábito).
 - Metas com intervalos customizados (ex.: a cada 3 dias ou a cada 15 dias).
 
 **Rastreabilidade:**
-- Implementação: Não implementado (Funcionalidade planejada)
-- Template/JS: Não implementado
-- Testes existentes: Não coberto por teste automatizado
+- Implementação: `apps/pagina_interna/models.py` (`Meta`), `apps/pagina_interna/forms.py` (`MetaForm`), `apps/pagina_interna/meta_views.py` (`metas`).
+- Testes: `apps/pagina_interna/test_meta.py` (`test_cliente_cria_meta_para_habito_proprio`, `test_nao_permite_meta_para_habito_negativo_ou_meta_duplicada`).
 
 ---
 
@@ -148,9 +148,8 @@ Sistema (motor de avaliação de metas).
 - Congelamento ou pausa temporária voluntária de metas ativas.
 
 **Rastreabilidade:**
-- Implementação: Não implementado (Funcionalidade planejada)
-- Template/JS: Não implementado
-- Testes existentes: Não coberto por teste automatizado
+- Implementação: `apps/pagina_interna/services.py` (`inicio_periodo`, `atualizar_ciclos_meta`).
+- Teste: `apps/pagina_interna/test_meta.py` (`test_periodos_semanais_mensais_e_anuais_seguem_calendario_civil`).
 
 ---
 
@@ -221,9 +220,8 @@ Sistema (gatilho de inclusão ou edição de `RegistroAtividade`).
 - Bonificações financeiras ou premiações por alcance antecipado da meta.
 
 **Rastreabilidade:**
-- Implementação: Não implementado (Funcionalidade planejada)
-- Template/JS: Não implementado
-- Testes existentes: Não coberto por teste automatizado
+- Implementação: `apps/pagina_interna/services.py` (`atualizar_ciclos_meta`), `apps/pagina_interna/models.py` (`MetaCiclo.data_cumprimento`).
+- Testes: `apps/pagina_interna/test_meta.py` (`test_progresso_percentual_e_limitado_a_cem`, `test_ciclo_ativo_mostra_progresso_e_meta_cumprida_atualiza_streak`).
 
 ---
 
@@ -296,9 +294,8 @@ Sistema (rotina de fechamento de ciclo temporal).
 - Tolerância de carência (*grace period*) ou reprocessamento retroativo de ciclos anteriores.
 
 **Rastreabilidade:**
-- Implementação: Não implementado (Funcionalidade planejada)
-- Template/JS: Não implementado
-- Testes existentes: Não coberto por teste automatizado
+- Implementação: `apps/pagina_interna/services.py` (`atualizar_ciclos_meta`), executável também por `manage.py atualizar_ciclos_metas`.
+- Testes: `apps/pagina_interna/test_meta.py` (`test_ciclo_encerrado_sem_meta_cumprida_reinicia_streak`, `test_comando_processa_fechamento_de_ciclo`).
 
 ---
 
@@ -363,9 +360,8 @@ Sistema (rotina de virada de ciclo temporal).
 - Multiplicadores de pontuação ou bônus com base na magnitude do streak.
 
 **Rastreabilidade:**
-- Implementação: Não implementado (Funcionalidade planejada)
-- Template/JS: Não implementado
-- Testes existentes: Não coberto por teste automatizado
+- Implementação: `apps/pagina_interna/models.py` (`Meta.streak`), `apps/pagina_interna/services.py` (`atualizar_ciclos_meta`).
+- Teste: `apps/pagina_interna/test_meta.py` (`test_fechamento_mensal_incrementa_streak_uma_vez`).
 
 ---
 
@@ -428,9 +424,8 @@ Sistema (rotina de virada de ciclo temporal).
 - Proteção paga de streak ou recuperação manual de sequência.
 
 **Rastreabilidade:**
-- Implementação: Não implementado (Funcionalidade planejada)
-- Template/JS: Não implementado
-- Testes existentes: Não coberto por teste automatizado
+- Implementação: `apps/pagina_interna/services.py` (`atualizar_ciclos_meta`).
+- Teste: `apps/pagina_interna/test_meta.py` (`test_ciclo_encerrado_sem_meta_cumprida_reinicia_streak`).
 
 ---
 
@@ -491,9 +486,9 @@ Cliente autenticado (titular da meta/hábito).
 - Lixeira ou recuperação de metas excluídas.
 
 **Rastreabilidade:**
-- Implementação: Não implementado (Funcionalidade planejada)
-- Template/JS: Não implementado
-- Testes existentes: Não coberto por teste automatizado
+- Implementação: `apps/pagina_interna/meta_views.py` (`excluir_meta`), rota POST `metas/<meta_id>/excluir/`.
+- Template: `apps/pagina_interna/templates/pagina_interna/metas.html`.
+- Teste: `apps/pagina_interna/test_meta.py` (`test_cliente_exclui_meta_sem_apagar_habito_ou_atividades`).
 
 ---
 
@@ -556,9 +551,9 @@ Cliente autenticado.
 - Conversão de unidades de medida (ex.: minutos para horas).
 
 **Rastreabilidade:**
-- Implementação: Não implementado (Funcionalidade planejada)
-- Template/JS: Não implementado
-- Testes existentes: Não coberto por teste automatizado
+- Implementação de estados, progresso e streak: `apps/pagina_interna/services.py`.
+- Integração após registo diário e renderização para Cliente/Parceiro: `apps/pagina_interna/views.py`, `apps/pagina_interna/meta_views.py` e `apps/pagina_interna/templates/pagina_interna/`.
+- Cobertura de unidade e integração: `apps/pagina_interna/test_meta.py`.
 
 ---
 
@@ -624,9 +619,8 @@ Sistema (motor de cálculo de métricas).
 - Projeção probabilística de alcance de meta futura.
 
 **Rastreabilidade:**
-- Implementação: Não implementado (Funcionalidade planejada)
-- Template/JS: Não implementado
-- Testes existentes: Não coberto por teste automatizado
+- Implementação: `apps/pagina_interna/models.py` (`MetaCiclo.percentual`), `apps/pagina_interna/templates/pagina_interna/metas.html` e `metas_partilhadas.html`.
+- Testes: `apps/pagina_interna/test_meta.py` (`test_progresso_percentual_e_limitado_a_cem`).
 
 ---
 
@@ -683,9 +677,8 @@ Cliente autenticado.
 - Envio de notificações push ou e-mails transacionais de confirmação.
 
 **Rastreabilidade:**
-- Implementação: Não implementado (Funcionalidade planejada)
-- Template/JS: Não implementado
-- Testes existentes: Não coberto por teste automatizado
+- Implementação: `apps/pagina_interna/meta_views.py` (`metas`) e `apps/pagina_interna/templates/pagina_interna/metas.html`.
+- Teste: `apps/pagina_interna/test_meta.py` (`test_cliente_cria_meta_para_habito_proprio`).
 
 ---
 
@@ -743,9 +736,8 @@ Sistema (modelo e operações de banco de dados).
 - Pontuações de penalidade negativa fora do modelo de streak.
 
 **Rastreabilidade:**
-- Implementação: Não implementado (Funcionalidade planejada)
-- Template/JS: Não implementado
-- Testes existentes: Não coberto por teste automatizado
+- Implementação: `apps/pagina_interna/models.py` (`Meta.streak`).
+- Teste: `apps/pagina_interna/test_meta.py` (`test_fechamento_mensal_incrementa_streak_uma_vez`).
 
 ---
 
@@ -803,9 +795,8 @@ Cliente autenticado / Sistema.
 - Inicialização de streak com valores herdados ou customizados pelo usuário.
 
 **Rastreabilidade:**
-- Implementação: Não implementado (Funcionalidade planejada)
-- Template/JS: Não implementado
-- Testes existentes: Não coberto por teste automatizado
+- Implementação: `apps/pagina_interna/meta_views.py` (`metas`).
+- Teste: `apps/pagina_interna/test_meta.py` (`test_cliente_cria_meta_para_habito_proprio`).
 
 ---
 
@@ -867,9 +858,8 @@ Cliente autenticado.
 - Metas de redução de danos ou limites máximos de tolerância para hábitos negativos.
 
 **Rastreabilidade:**
-- Implementação: Não implementado (Funcionalidade planejada)
-- Template/JS: Não implementado
-- Testes existentes: Não coberto por teste automatizado
+- Implementação: `apps/pagina_interna/forms.py` (`MetaForm.clean_habito`), validação do modelo `Meta` e bloqueio de conversão na vista de edição de hábito.
+- Testes: `apps/pagina_interna/test_meta.py` (`test_nao_permite_meta_para_habito_negativo_ou_meta_duplicada`, `test_nao_permite_converter_para_negativo_habito_com_meta`).
 
 ---
 
@@ -926,9 +916,8 @@ Cliente autenticado.
 - Delegação formal de administração de conta para terceiros.
 
 **Rastreabilidade:**
-- Implementação: Não implementado (Funcionalidade planejada)
-- Template/JS: Não implementado
-- Testes existentes: Não coberto por teste automatizado
+- Implementação: `apps/pagina_interna/meta_views.py` limita consultas e exclusões pelo titular e `apps/pagina_interna/forms.py` limita hábitos ao Cliente da sessão.
+- Testes: `apps/pagina_interna/test_meta.py` (`test_parceiro_nao_pode_escrever_dados_de_cliente`, `test_cliente_exclui_meta_sem_apagar_habito_ou_atividades`).
 
 ---
 
@@ -991,9 +980,8 @@ Cliente autenticado.
 - Estados intermediários ou personalizados (ex.: "em risco", "quase lá").
 
 **Rastreabilidade:**
-- Implementação: Não implementado (Funcionalidade planejada)
-- Template/JS: Não implementado
-- Testes existentes: Não coberto por teste automatizado
+- Implementação: `apps/pagina_interna/templates/pagina_interna/metas.html` e `metas_partilhadas.html`.
+- Teste: `apps/pagina_interna/test_meta.py` (`MetaProgressTest`, `ParceiroAcompanhamentoTest`).
 
 ---
 
@@ -1051,9 +1039,8 @@ Cliente autenticado.
 - Gráficos históricos de evolução do streak ao longo dos anos.
 
 **Rastreabilidade:**
-- Implementação: Não implementado (Funcionalidade planejada)
-- Template/JS: Não implementado
-- Testes existentes: Não coberto por teste automatizado
+- Implementação: `apps/pagina_interna/templates/pagina_interna/metas.html` e `metas_partilhadas.html`.
+- Teste: `apps/pagina_interna/test_meta.py` (`test_fechamento_mensal_incrementa_streak_uma_vez`).
 
 ---
 
@@ -1069,3 +1056,27 @@ Cliente autenticado.
 | `ativa` | Virada de período (`agora > data_fim`) | `total_atividades < quantidade_minima` | `não cumprida` (reinicia ciclo como `ativa`) | `streak = 0` |
 | `cumprida` | Virada de período (`agora > data_fim`) | `total_atividades >= quantidade_minima` | Reinicia ciclo como `ativa` | `streak = streak + 1` |
 | `não cumprida` | Virada de período (`agora > data_fim`) | Início de novo ciclo temporal | `ativa` (novo ciclo) | Inicia com `streak = 0` |
+
+## Implementação e TDD
+
+Os testes foram escritos antes das correções das regras de calendário, estados, progresso, streak, exclusão e permissões. A cobertura inclui testes unitários de ciclo e testes de integração HTTP para Cliente e Parceiro.
+
+1. **Etapa 1 — Regras Básicas de Metas** (implementada):
+   - Definição de quantidade mínima de atividades por período (`dia`, `semana`, `mes`, `ano`);
+   - Atribuição do estado inicial `ativa`;
+   - Transição automática para `cumprida` ao atingir a quantidade mínima;
+   - Transição automática para `não cumprida` quando o período encerrar sem que a quantidade mínima tenha sido alcançada.
+
+2. **Etapa 2 — Funcionalidade de Sequência (`streak`)** (implementada):
+   - Manutenção do contador de períodos consecutivos cumpridos;
+   - Incremento da sequência a cada período cumprido;
+   - Interrupção e reinício da sequência para 0 quando o período terminar sem cumprimento.
+
+### Fluxo de Trabalho (TDD) aplicado
+O ciclo utilizado foi:
+1. **Spec**: Validação dos requisitos documentados.
+2. **Teste automatizado**: Criação de testes unitários/integração cobrindo o requisito.
+3. **Teste falhando (RED)**: Execução para confirmar falha controlada do teste antes do código.
+4. **Implementação mínima**: Escrita do código estritamente necessário para atender à regra.
+5. **Teste passando (GREEN)**: Execução para confirmar aprovação de todos os testes.
+6. **Auditoria de aderência à spec**: Revisão de cobertura e rastreabilidade entre código, testes e especificação.
