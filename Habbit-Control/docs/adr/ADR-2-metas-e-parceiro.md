@@ -25,7 +25,8 @@ O projeto já separava autenticação e páginas internas em aplicações Django
 - Regras de ciclo podem ser exercitadas sem depender da renderização de uma página.
 - A consulta do Parceiro filtra as metas pela associação explícita e não oferece operações de escrita.
 - A sessão usa o mecanismo existente do projeto; Cliente e Parceiro não são unificados num novo modelo de autenticação nesta alteração.
-- O trabalho futuro sobre calendário civil e fechamento automatizado de ciclos deve ser feito no serviço de ciclos e acompanhado de testes dedicados.
+- Os períodos seguem o calendário civil e o comando `atualizar_ciclos_metas` permite fechar ciclos mesmo sem acessos à interface. O ambiente de produção deve agendar esse comando diariamente.
+- O serviço conserva o estado dos ciclos encerrados; alterações retroativas não reabrem esses ciclos nem recalculam o streak consolidado.
 
 ## Validação
 
