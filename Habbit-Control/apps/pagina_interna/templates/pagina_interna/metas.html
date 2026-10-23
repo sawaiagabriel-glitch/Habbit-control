@@ -1,0 +1,55 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Metas - Habit Control{% endblock %}
+{% block content %}
+<div class="dashboard-page">
+    <div class="page-header">
+        <h1 class="page-title">Metas e sequências</h1>
+        <p class="page-subtitle">Defina objetivos por período e acompanhe a evolução dos seus hábitos.</p>
+    </div>
+
+    {% if messages %}<div class="messages-toast-top">{% for message in messages %}<div class="message-toast-top message-toast-{{ message.tags }}">{{ message }}</div>{% endfor %}</div>{% endif %}
+
+    <section class="info-card goal-form-card">
+        <h2 class="section-title">Definir uma meta</h2>
+        <form method="post" class="goal-form">
+            {% csrf_token %}
+            {% for field in form %}
+                <div class="form-group goal-field">
+                    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    {{ field }}
+                    {% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}
+                    {% for error in field.errors %}<p class="goal-error">{{ error }}</p>{% endfor %}
+                </div>
+            {% endfor %}
+            <button class="btn-submit-habito" type="submit">Criar meta</button>
+        </form>
+    </section>
+
+    <section class="goal-list">
+        <h2 class="section-title">Metas dos meus hábitos</h2>
+        {% for meta in metas %}
+            {% with ciclo=meta.ciclos.last %}
+            <article class="info-card goal-card">
+                <div class="goal-card-heading">
+                    <div><h3>{{ meta.habito.nome_habito }}</h3><p>{{ meta.quantidade_minima }} atividades por {{ meta.get_periodo_display|lower }}</p></div>
+                    <span class="goal-status goal-status-{{ ciclo.estado|default:'ativa' }}">{{ ciclo.get_estado_display|default:'Ativa' }}</span>
+                </div>
+                <div class="goal-progress-meta"><span>Progresso do período</span><strong>{{ ciclo.progresso|default:0 }} / {{ meta.quantidade_minima }} ({{ ciclo.percentual|default:0 }}%)</strong></div>
+                <progress class="goal-progress" value="{{ ciclo.percentual|default:0 }}" max="100" aria-label="{{ ciclo.percentual|default:0 }}% da meta"></progress>
+                <p class="goal-streak">Sequência atual: <strong>{{ meta.streak }}</strong> período(s)</p>
+                {% if meta.parceiros.exists %}<p class="goal-sharing">Partilhada com: {% for parceiro in meta.parceiros.all %}{{ parceiro.nome_completo }}{% if not forloop.last %}, {% endif %}{% endfor %}</p>{% endif %}
+                <form method="post" action="{% url 'excluir_meta' meta.id %}" class="goal-delete-form">
+                    {% csrf_token %}
+                    <button type="submit" class="goal-delete-button">Excluir meta</button>
+                </form>
+            </article>
+            {% endwith %}
+        {% empty %}
+            <div class="info-card empty-state"><h3 class="empty-state-title">Ainda não existem metas</h3><p class="empty-state-text">Escolha um hábito e defina o primeiro objetivo.</p></div>
+        {% endfor %}
+    </section>
+</div>
+{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'pagina_interna/css/style.css' %}">{% endblock %}

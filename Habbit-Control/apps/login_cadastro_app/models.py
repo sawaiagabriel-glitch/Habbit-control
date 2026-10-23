@@ -14,6 +14,9 @@ class Cliente(models.Model):
     # --- Localização ---
     estado = models.CharField(max_length=2, verbose_name="Estado", blank=True, null=True)
     cidade = models.CharField(max_length=100, verbose_name="Cidade", blank=True, null=True) 
+
+    # --- Profissão ---
+    profissao = models.CharField(max_length=100, blank=True, null=True, verbose_name="Profissão")
     
     # --- Consentimentos ---
     lgpd = models.BooleanField(default=False, verbose_name="Aceitou Termos LGPD")
@@ -40,3 +43,29 @@ class Cliente(models.Model):
     class Meta:
         verbose_name = "Cliente"
         verbose_name_plural = "Clientes"
+
+
+class Parceiro(models.Model):
+    """Conta de leitura que recebe acesso apenas às metas partilhadas."""
+    nome_completo = models.CharField(max_length=255, verbose_name="Nome Completo")
+    email = models.EmailField(unique=True, verbose_name="Email")
+    password = models.CharField(max_length=128, verbose_name="Senha")
+    data_criacao = models.DateTimeField(auto_now_add=True, verbose_name="Data de Criação")
+
+    def __str__(self):
+        return f"{self.nome_completo} - {self.email}"
+
+    def check_password(self, raw_password):
+        """Compara a senha informada com o hash guardado na conta."""
+        return check_password(raw_password, self.password)
+
+    def save(self, *args, **kwargs):
+        """Normaliza o email e guarda a senha sempre como hash Django."""
+        self.email = self.email.lower().strip()
+        if not self.password.startswith('pbkdf2_sha256$'):
+            self.password = make_password(self.password)
+        super().save(*args, **kwargs)
+
+    class Meta:
+        verbose_name = "Parceiro de Acompanhamento"
+        verbose_name_plural = "Parceiros de Acompanhamento"

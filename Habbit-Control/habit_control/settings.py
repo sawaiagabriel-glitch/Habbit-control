@@ -14,6 +14,21 @@ from pathlib import Path
 import os
 import dj_database_url
 
+
+def resolve_secure_cookies(debug, configured_value):
+    """Escolhe a política de cookies para desenvolvimento ou produção.
+
+    Args:
+        debug: Indica se o projeto está em modo de desenvolvimento.
+        configured_value: Valor opcional de ``SECURE_COOKIES``.
+
+    Returns:
+        ``True`` para cookies HTTPS-only; caso contrário, ``False``.
+    """
+    if configured_value is None:
+        return not debug
+    return configured_value.lower() in ('true', '1', 'yes', 'on')
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -159,7 +174,10 @@ CORS_ALLOWED_ORIGINS = [
     "https://habbit-control.onrender.com",
 ]
 
-SESSION_COOKIE_SECURE = True
-CSRF_COOKIE_SECURE = True
-SESSION_COOKIE_SAMESITE = 'None'
-CSRF_COOKIE_SAMESITE = 'None'
+secure_cookies_env = os.environ.get('SECURE_COOKIES')
+SECURE_COOKIES = resolve_secure_cookies(DEBUG, secure_cookies_env)
+
+SESSION_COOKIE_SECURE = SECURE_COOKIES
+CSRF_COOKIE_SECURE = SECURE_COOKIES
+SESSION_COOKIE_SAMESITE = 'None' if SECURE_COOKIES else 'Lax'
+CSRF_COOKIE_SAMESITE = 'None' if SECURE_COOKIES else 'Lax'

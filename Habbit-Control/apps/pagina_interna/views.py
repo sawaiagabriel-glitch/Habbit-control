@@ -6,25 +6,12 @@ from django.views.decorators.http import require_POST
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 import json
-from apps.login_cadastro_app.models import Cliente 
+from apps.login_cadastro_app.models import Cliente
+from .access import get_cliente_from_session
+from .models import Habito, Meta, RegistroAtividade
+from .services import atualizar_ciclos_meta
 
 # Create your views here.
-
-def get_cliente_from_session(request):
-	"""Função auxiliar para obter o cliente da sessão."""
-	cliente_email = request.session.get('cliente_email')
-	
-	if not cliente_email:
-		return None, None
-	
-	cliente = Cliente.objects.filter(email=cliente_email).first()
-	
-	if not cliente:
-		# Se o email na sessão não existe mais no banco, limpa a sessão
-		del request.session['cliente_email']
-		return None, None
-	
-	return cliente, cliente_email
 
 def alterar_dados(request):
 	try:
@@ -220,6 +207,7 @@ def relatorios(request):
 	
 	return render(request, 'pagina_interna/relatorios.html', context)
 
+
 def api_dados_relatorio(request):
 	#API endpoint para buscar dados do gráfico de relatórios
 	from django.http import JsonResponse
@@ -384,6 +372,8 @@ def editar_habito(request, habito_id):
 	cliente, _ = get_cliente_from_session(request)
 	
 	if not cliente:
+		if request.session.get('parceiro_email'):
+			return redirect('login')
 		messages.warning(request, 'Por favor, faça login para acessar esta página.')
 		return redirect('login')
 	
@@ -438,6 +428,11 @@ def editar_habito(request, habito_id):
 				return render(request, 'pagina_interna/editar_habito.html', {'cliente': cliente, 'habito': habito})
 			
 			# Atualiza o hábito
+			# Uma meta existente depende de o hábito permanecer positivo.
+			if tipo_habito == 'negativo' and habito.metas.exists():
+				messages.error(request, 'Exclua a meta antes de converter o hábito para negativo.')
+				return render(request, 'pagina_interna/editar_habito.html', {'cliente': cliente, 'habito': habito})
+
 			habito.tipo_habito = tipo_habito
 			habito.nome_habito = nome_habito
 			habito.frequencia_atual_valor = freq_atual
@@ -501,6 +496,10 @@ def registrar_atividade(request):
 				# Se já existe, atualiza a quantidade
 				registro.quantidade = quantidade
 				registro.save()
+
+			# Atualiza o ciclo corrente após persistir a atividade do hábito.
+			for meta in Meta.objects.filter(habito=habito):
+				atualizar_ciclos_meta(meta)
 			
 			return JsonResponse({
 				'success': True,
