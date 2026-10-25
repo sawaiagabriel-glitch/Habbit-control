@@ -1230,5 +1230,112 @@
     .chart-wrapper {
         height: 300px;
     }
+
+    .dashboard-progresso-filters {
+        flex-direction: column;
+    }
+
+    .dashboard-atividade-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 4px;
+    }
+}
+
+/* ============================================
+   DASHBOARD
+   ============================================ */
+
+.dashboard-section {
+    margin-bottom: 24px;
+}
+
+.dashboard-progresso-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-bottom: 20px;
+}
+
+.dashboard-progresso-stats {
+    display: grid;
+    margin-bottom: 16px;
+}
+
+.dashboard-progress-bar-wrap {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 8px;
+}
+
+.dashboard-progress-bar {
+    flex: 1;
+    height: 14px;
+    background: #E8EEF0;
+    border-radius: 999px;
+    overflow: hidden;
+}
+
+.dashboard-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #004B5E 0%, #10B981 100%);
+    border-radius: 999px;
+    transition: width 0.35s ease;
+    min-width: 0;
+}
+
+.dashboard-progress-fill[data-tipo="negativo"] {
+    background: linear-gradient(90deg, #004B5E 0%, #EF4444 100%);
+}
+
+.dashboard-progress-label {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #004B5E;
+    min-width: 48px;
+    text-align: right;
+}
+
+.dashboard-atividade-lista {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.dashboard-atividade-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 14px;
+    background: #F8F9FA;
+    border-radius: 10px;
+    border: 1px solid #E8EEF0;
+}
+
+.dashboard-atividade-nome {
+    font-weight: 600;
+    color: #004B5E;
+}
+
+.dashboard-atividade-qtd {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #004B5E;
+    background: white;
+    border-radius: 8px;
+    padding: 4px 12px;
+    border: 1px solid #E0E0E0;
+    min-width: 40px;
+    text-align: center;
+}
+
+.dashboard-atividade-meta {
+    font-size: 0.875rem;
+    color: #666;
+    font-weight: 500;
 }
 

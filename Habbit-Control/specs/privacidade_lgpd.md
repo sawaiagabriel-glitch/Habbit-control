@@ -30,7 +30,7 @@ Qualquer usuário (visitante anônimo ou cliente autenticado).
 1. A rota `/consentimento/` deve ser pública e não exigir autenticação nem sessão ativa.
 2. A resposta deve ter código de status HTTP 200 e utilizar o template `login_cadastro_app/consentimento.html`.
 3. O documento exibido deve discriminar com precisão:
-   - **Categorias de dados coletados:** Nome completo, Idade, Email, Cidade e residência, Profissão (opcional);
+   - **Categorias de dados coletados:** Nome completo, Idade, Email, Cidade e estado de residência;
    - **Finalidades de tratamento:** Segurança da plataforma (prevenção a fraudes e bots), Estudos acadêmicos anonimizados e Melhoria dos serviços;
    - **Medidas técnicas de proteção:** Armazenamento em servidores com criptografia e hash PBKDF2 SHA-256 para credenciais;
    - **Direitos do titular previstos na LGPD:** Acesso, correção de dados incompletos ou desatualizados, exclusão de dados, revogação do consentimento, portabilidade e não submissão a decisões automatizadas;

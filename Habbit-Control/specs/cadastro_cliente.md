@@ -29,7 +29,7 @@ Visitante (usuário não autenticado).
 **Regras de negócio:**
 1. A rota `/cadastro/cliente/` deve responder a requisições com o método HTTP GET.
 2. A resposta deve renderizar o formulário HTML `ClienteForm` instanciado sem dados prévios.
-3. O formulário deve expor os campos: `nome_completo`, `idade`, `email`, `password`, `estado`, `cidade`, `profissao` e `lgpd`.
+3. O formulário deve expor os campos: `nome_completo`, `idade`, `email`, `password`, `estado`, `cidade` e `lgpd`.
 4. O campo `password` deve ser renderizado como campo de entrada com ocultação de caracteres (`type="password"`).
 5. O campo `estado` deve ser renderizado inicialmente com a opção padrão "Selecione o estado".
 6. O campo `cidade` deve ser renderizado inicialmente desabilitado com o texto "Selecione primeiro o estado".
@@ -45,7 +45,7 @@ Visitante (usuário não autenticado).
 - Não há fluxos alternativos definidos para o método GET.
 
 **Resultado esperado:**
-- Página HTML carregada contendo o formulário de cadastro estruturado em seções ("Dados Pessoais e Acesso", "Localização", "Profissão", "Consentimentos").
+- Página HTML carregada contendo o formulário de cadastro estruturado em seções ("Dados Pessoais e Acesso", "Localização", "Consentimentos").
 
 **Persistência:**
 - Nenhuma alteração é persistida no banco de dados.
@@ -54,7 +54,7 @@ Visitante (usuário não autenticado).
 - GIVEN que um visitante acessa a aplicação
   WHEN enviar uma requisição HTTP GET para `/cadastro/cliente/`
   THEN o sistema deve responder com código HTTP 200
-  AND o corpo da resposta deve conter o formulário com os campos `nome_completo`, `idade`, `email`, `password`, `estado`, `cidade`, `profissao` e `lgpd`
+  AND o corpo da resposta deve conter o formulário com os campos `nome_completo`, `idade`, `email`, `password`, `estado`, `cidade` e `lgpd`
   AND o campo ou máscara de CPF não deve estar presente no conteúdo retornado.
 
 **Casos-limite:**
@@ -95,7 +95,6 @@ Visitante.
 | `password` | String | Sim | Texto da senha em texto plano; máximo de 100 caracteres no formulário. |
 | `estado` | String | Não | Sigla de UF brasileira com até 2 caracteres, ou vazio/nulo. |
 | `cidade` | String | Não | Máximo de 100 caracteres, ou vazio/nulo. |
-| `profissao` | String | Não | Máximo de 100 caracteres, ou vazio/nulo. |
 | `lgpd` | Booleano | Sim | Deve ser estritamente `True` (marcado). |
 
 **Regras de negócio:**
@@ -126,7 +125,7 @@ Visitante.
 - Registro do cliente inserido no banco de dados com hash de senha e e-mail normalizado.
 
 **Persistência:**
-- Tabela `login_cadastro_app_cliente`: inserção de 1 novo registro contendo `nome_completo`, `idade`, `email` (em minúsculas), `password` (iniciando com prefixo `pbkdf2_sha256$`), `estado`, `cidade`, `profissao`, `lgpd=True` e `data_criacao`.
+- Tabela `login_cadastro_app_cliente`: inserção de 1 novo registro contendo `nome_completo`, `idade`, `email` (em minúsculas), `password` (iniciando com prefixo `pbkdf2_sha256$`), `estado`, `cidade`, `lgpd=True` e `data_criacao`.
 
 **Critérios de aceitação:**
 - GIVEN que um visitante preenche o formulário com `nome_completo="Carlos Pereira"`, `idade=40`, `email="  CARLOS@GMAIL.COM  "`, `password="senhaForte@123"` e `lgpd=True`
@@ -138,7 +137,7 @@ Visitante.
 
 **Casos-limite:**
 - E-mail com espaços no início e no fim e caracteres em maiúsculas: o sistema deve remover os espaços e converter tudo para minúsculas.
-- Campos opcionais (`estado`, `cidade`, `profissao`) não preenchidos: o sistema deve persistir com valores nulos/vazios sem falha.
+- Campos opcionais (`estado`, `cidade`) não preenchidos: o sistema deve persistir com valores nulos/vazios sem falha.
 
 **Fora de escopo:**
 - Envio de e-mail de ativação de conta ou confirmação de cadastro.
