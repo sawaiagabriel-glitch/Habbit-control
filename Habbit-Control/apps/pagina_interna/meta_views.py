@@ -9,7 +9,7 @@ from django.utils import timezone
 from apps.login_cadastro_app.models import Parceiro
 from .access import get_cliente_from_session
 from .forms import MetaForm
-from .meta_assistant import sugerir_meta
+from .meta_assistant import sanitizar_objetivo_texto, sugerir_meta
 from .models import Habito, Meta
 from .services import atualizar_ciclos_meta, inicio_periodo, _proximo_inicio, _progresso_do_ciclo
 
@@ -197,10 +197,10 @@ def meta_publica(request, token):
 
 
 def assistente_sugerir_meta(request):
-    """Endpoint autenticado para calcular sugestão determinística de Meta.
+    """Endpoint autenticado para sugerir Meta (IA com fallback determinístico).
 
     Aceita apenas POST via JSON ou formulário. Não altera e não cria registros
-    no banco de dados.
+    no banco de dados. O texto opcional ``objetivo_texto`` não é persistido.
     """
     if request.method != 'POST':
         return JsonResponse({'sucesso': False, 'erro': 'Método não permitido.'}, status=405)
@@ -221,6 +221,7 @@ def assistente_sugerir_meta(request):
     frequencia_atual = data.get('frequencia_atual')
     periodo = data.get('periodo')
     nivel = data.get('nivel')
+    objetivo_texto = sanitizar_objetivo_texto(data.get('objetivo_texto'))
 
     if not habito_id:
         return JsonResponse({'sucesso': False, 'erro': 'Selecione um hábito para a meta.'}, status=400)
@@ -253,11 +254,15 @@ def assistente_sugerir_meta(request):
             frequencia_atual=frequencia_atual_int,
             nivel=nivel,
             periodo=periodo,
+            nome_habito=habito.nome_habito,
+            frequencia_desejada=habito.frequencia_desejada_valor,
+            periodo_desejado=habito.frequencia_desejada_periodo,
+            objetivo_texto=objetivo_texto,
         )
     except ValueError as e:
         return JsonResponse({'sucesso': False, 'erro': str(e)}, status=400)
 
-    return JsonResponse({
+    resposta = {
         'sucesso': True,
         'habito_id': habito.id,
         'nome_habito': habito.nome_habito,
@@ -265,4 +270,8 @@ def assistente_sugerir_meta(request):
         'periodo': sugestao['periodo'],
         'nivel': sugestao['nivel'],
         'mensagem': sugestao['mensagem'],
-    })
+        'origem': sugestao.get('origem', 'deterministico'),
+    }
+    if sugestao.get('justificativa'):
+        resposta['justificativa'] = sugestao['justificativa']
+    return JsonResponse(resposta)

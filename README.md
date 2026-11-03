@@ -97,6 +97,33 @@ python manage.py migrate
 python manage.py runserver
 ```
 
+## Assistente de Metas (OpenAI opcional)
+
+O assistente de criação de metas é híbrido: quando a OpenAI estiver configurada, gera uma sugestão personalizada via Responses API; caso contrário (ou em qualquer falha), usa automaticamente o algoritmo determinístico local. A IA apenas sugere valores — nunca cria nem salva uma Meta.
+
+1. Instale as dependências:
+
+```zsh
+python -m pip install -r requirements.txt
+```
+
+2. Crie um ficheiro `.env` a partir do exemplo (na pasta `Habbit-Control/`):
+
+```zsh
+cp .env.example .env
+```
+
+3. Defina a chave (opcional):
+
+```env
+OPENAI_API_KEY=
+OPENAI_META_ASSISTANT_MODEL=
+```
+
+- Sem `OPENAI_API_KEY`, o assistente continua a funcionar com o fallback determinístico.
+- `OPENAI_META_ASSISTANT_MODEL` é opcional; se vazio, o backend usa o default configurado em `settings.py` (`gpt-4.1-mini`).
+- Nunca coloque uma chave real no repositório, no frontend ou na documentação.
+
 ## Testes e verificações
 
 Executar todos os testes:
@@ -111,7 +138,7 @@ Executar apenas os testes de metas e parceiro:
 python manage.py test apps.pagina_interna.test_meta
 ```
 
-Os testes incluem criação de metas, períodos civis, transições e streak, exclusão sem apagar histórico, partilha através dos formulários e bloqueio das operações de escrita do Parceiro. Os testes HTTP de autenticação e atividade usam verificação CSRF ativa.
+Os testes incluem criação de metas, períodos civis, transições e streak, exclusão sem apagar histórico, partilha através dos formulários e bloqueio das operações de escrita do Parceiro. Os testes HTTP de autenticação e atividade usam verificação CSRF ativa. Os testes do assistente mockam a OpenAI e não fazem chamadas reais à API.
 
 Verificar configuração e migrações:
 

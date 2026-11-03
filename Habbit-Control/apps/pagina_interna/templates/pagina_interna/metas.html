@@ -110,6 +110,18 @@
                     </div>
                 </div>
 
+                <div class="assistant-field">
+                    <label for="assistant-objetivo" class="assistant-label">Descreva seu objetivo <span class="assistant-optional">(opcional)</span></label>
+                    <textarea
+                        id="assistant-objetivo"
+                        class="assistant-input assistant-textarea"
+                        maxlength="200"
+                        rows="2"
+                        placeholder="Ex.: Quero voltar a correr sem exagerar."
+                    ></textarea>
+                    <p class="assistant-hint">Até 200 caracteres. Não é salvo no banco.</p>
+                </div>
+
                 <div class="assistant-actions">
                     <button type="button" class="btn-assistant-cancel" onclick="fecharAssistenteMetas()">Cancelar</button>
                     <button type="button" class="btn-assistant-submit" id="btn-gerar-sugestao" onclick="solicitarSugestaoAssistente()">
@@ -123,6 +135,7 @@
                 <div class="assistant-suggestion-card">
                     <div class="suggestion-icon" aria-hidden="true">🎯</div>
                     <div class="suggestion-details">
+                        <span id="suggestion-origem-badge" class="suggestion-origem-badge" style="display: none;">✨ Sugestão personalizada</span>
                         <span class="suggestion-subtitle">Minha sugestão para você:</span>
                         <h4 id="suggestion-title" class="suggestion-title">Academia</h4>
                         <p id="suggestion-highlight" class="suggestion-highlight">4 vezes por semana</p>
@@ -284,6 +297,8 @@ function solicitarSugestaoAssistente() {
     const periodo = document.getElementById('assistant-periodo').value;
     const nivelRadio = document.querySelector('input[name="assistant-level"]:checked');
     const nivel = nivelRadio ? nivelRadio.value : 'equilibrada';
+    const objetivoEl = document.getElementById('assistant-objetivo');
+    const objetivoTexto = objetivoEl ? String(objetivoEl.value || '').trim().slice(0, 200) : '';
 
     if (!habitoId) {
         mostrarAlertaAssistente('Selecione um hábito para receber a sugestão.');
@@ -310,7 +325,8 @@ function solicitarSugestaoAssistente() {
             habito_id: habitoId,
             frequencia_atual: frequencia,
             periodo: periodo,
-            nivel: nivel
+            nivel: nivel,
+            objetivo_texto: objetivoTexto
         })
     })
     .then(res => res.json().then(data => ({ status: res.status, body: data })))
@@ -327,6 +343,11 @@ function solicitarSugestaoAssistente() {
         document.getElementById('suggestion-title').innerText = body.nome_habito;
         document.getElementById('suggestion-highlight').innerText = body.quantidade_sugerida + ' vezes por ' + body.periodo;
         document.getElementById('suggestion-text').innerText = body.mensagem;
+
+        const badge = document.getElementById('suggestion-origem-badge');
+        if (badge) {
+            badge.style.display = (body.origem === 'ia') ? 'inline-block' : 'none';
+        }
 
         document.getElementById('assistant-step-form').style.display = 'none';
         document.getElementById('assistant-step-result').style.display = 'block';
@@ -533,6 +554,36 @@ function compartilharNativo(titulo, url) {
     margin-bottom: 6px;
 }
 .assistant-select,
+.assistant-optional {
+    font-weight: 500;
+    color: #6B7F85;
+    font-size: 0.85em;
+}
+
+.assistant-hint {
+    margin: 4px 0 0;
+    font-size: 0.78rem;
+    color: #6B7F85;
+}
+
+.assistant-textarea {
+    resize: vertical;
+    min-height: 64px;
+    font-family: inherit;
+    line-height: 1.4;
+}
+
+.suggestion-origem-badge {
+    display: inline-block;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #005250;
+    background: #E8F4F2;
+    border-radius: 4px;
+    padding: 2px 8px;
+    margin-bottom: 6px;
+}
+
 .assistant-input {
     width: 100%;
     min-height: 42px;

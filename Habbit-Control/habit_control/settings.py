@@ -181,3 +181,11 @@ SESSION_COOKIE_SECURE = SECURE_COOKIES
 CSRF_COOKIE_SECURE = SECURE_COOKIES
 SESSION_COOKIE_SAMESITE = 'None' if SECURE_COOKIES else 'Lax'
 CSRF_COOKIE_SAMESITE = 'None' if SECURE_COOKIES else 'Lax'
+
+# Assistente de Metas (OpenAI Responses API) — chave apenas via ambiente; nunca no código.
+OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', '')
+OPENAI_META_ASSISTANT_MODEL = os.environ.get('OPENAI_META_ASSISTANT_MODEL', 'gpt-4.1-mini')
+try:
+    OPENAI_META_ASSISTANT_TIMEOUT = float(os.environ.get('OPENAI_META_ASSISTANT_TIMEOUT', '15'))
+except (TypeError, ValueError):
+    OPENAI_META_ASSISTANT_TIMEOUT = 15.0
