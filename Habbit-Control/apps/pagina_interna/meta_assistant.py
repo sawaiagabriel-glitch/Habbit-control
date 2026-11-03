@@ -39,15 +39,77 @@ SYSTEM_PROMPT = (
     'Você é um assistente do Habbit-Control especializado em ajudar usuários a '
     'criar metas de hábitos realistas, progressivas e mensuráveis.\n\n'
     'Sua função é sugerir uma quantidade e um período com base apenas no hábito, '
-    'frequência atual, objetivo e nível de desafio informado.\n\n'
+    'frequência atual, objetivo e nível de desafio informado, e também um plano '
+    'estruturado de execução com poucas etapas curtas e objetivas.\n\n'
+    'Regras do plano:\n'
+    '- Crie de 1 a 4 etapas.\n'
+    '- Cada etapa deve ser curta e objetiva.\n'
+    '- O plano deve ser compatível com quantidade_sugerida e periodo.\n'
+    '- Não aumente agressivamente frequência ou volume.\n'
+    '- Priorize consistência antes de intensidade.\n\n'
     'Não faça diagnósticos médicos, psicológicos ou nutricionais.\n'
     'Não dê conselhos perigosos.\n'
-    'Não sugira valores extremos ou impraticáveis.\n'
+    'Não sugira valores extremos, impraticáveis ou comportamentos perigosos.\n'
     'Não invente dados do usuário.\n'
     'A meta deve ser específica, simples e mensurável.\n'
     'Você não cria nem salva metas. Apenas gera uma sugestão.\n'
     'Retorne obrigatoriamente dados estruturados conforme o schema fornecido.'
 )
+
+PLANO_ETAPA_SCHEMA = {
+    'type': 'object',
+    'properties': {
+        'titulo': {
+            'type': 'string',
+            'description': 'Nome curto da etapa (ex.: Adaptação).',
+        },
+        'duracao_semanas': {
+            'type': 'integer',
+            'description': 'Duração da etapa em semanas (inteiro >= 1).',
+        },
+        'descricao': {
+            'type': 'string',
+            'description': 'Orientação objetiva do que fazer nesta etapa.',
+        },
+    },
+    'required': ['titulo', 'duracao_semanas', 'descricao'],
+    'additionalProperties': False,
+}
+
+PLANO_META_SCHEMA = {
+    'type': 'object',
+    'properties': {
+        'duracao_sugerida_semanas': {
+            'type': 'integer',
+            'description': 'Duração total sugerida do plano em semanas (1 a 52).',
+        },
+        'criterio_sucesso': {
+            'type': 'string',
+            'description': 'Critério claro para considerar o plano bem-sucedido.',
+        },
+        'etapas': {
+            'type': 'array',
+            'description': 'De 1 a 4 etapas progressivas e realistas.',
+            'items': PLANO_ETAPA_SCHEMA,
+        },
+        'plano_recuperacao': {
+            'type': 'string',
+            'description': 'Orientação caso o usuário saia do ritmo.',
+        },
+        'dica': {
+            'type': 'string',
+            'description': 'Dica prática curta de consistência.',
+        },
+    },
+    'required': [
+        'duracao_sugerida_semanas',
+        'criterio_sucesso',
+        'etapas',
+        'plano_recuperacao',
+        'dica',
+    ],
+    'additionalProperties': False,
+}
 
 SUGESTAO_META_SCHEMA = {
     'type': 'object',
@@ -74,6 +136,7 @@ SUGESTAO_META_SCHEMA = {
             'type': 'string',
             'description': 'Explicação curta da recomendação.',
         },
+        'plano': PLANO_META_SCHEMA,
     },
     'required': [
         'quantidade_sugerida',
@@ -81,9 +144,18 @@ SUGESTAO_META_SCHEMA = {
         'nivel',
         'mensagem',
         'justificativa',
+        'plano',
     ],
     'additionalProperties': False,
 }
+
+# Limites usados apenas na validação defensiva do plano (não persistidos).
+PLANO_DURACAO_TOTAL_MIN = 1
+PLANO_DURACAO_TOTAL_MAX = 52
+PLANO_ETAPA_DURACAO_MAX = 26
+PLANO_ETAPAS_MIN = 1
+PLANO_ETAPAS_MAX = 4
+PLANO_TEXTO_MAX_CHARS = 400
 
 
 class MetaAssistantIAError(Exception):
@@ -197,8 +269,80 @@ def sugerir_meta_deterministica(frequencia_atual: int, nivel: str, periodo: str)
     }
 
 
+def _validar_plano(plano_bruto: Any) -> dict | None:
+    """Valida e normaliza o plano estruturado.
+
+    Retorna o plano normalizado ou ``None`` se inválido (falha soft: a sugestão
+    principal da meta permanece válida). Não exige igualdade estrita entre a
+    soma das durações das etapas e ``duracao_sugerida_semanas``.
+    """
+    if not isinstance(plano_bruto, dict):
+        return None
+
+    duracao_total = plano_bruto.get('duracao_sugerida_semanas')
+    if isinstance(duracao_total, bool) or not isinstance(duracao_total, int):
+        return None
+    if duracao_total < PLANO_DURACAO_TOTAL_MIN or duracao_total > PLANO_DURACAO_TOTAL_MAX:
+        return None
+
+    etapas_brutas = plano_bruto.get('etapas')
+    if not isinstance(etapas_brutas, list):
+        return None
+    if not (PLANO_ETAPAS_MIN <= len(etapas_brutas) <= PLANO_ETAPAS_MAX):
+        return None
+
+    etapas_normalizadas: list[dict] = []
+    soma_duracoes = 0
+    for etapa in etapas_brutas:
+        if not isinstance(etapa, dict):
+            return None
+        titulo = etapa.get('titulo')
+        descricao = etapa.get('descricao')
+        duracao = etapa.get('duracao_semanas')
+        if not isinstance(titulo, str) or not titulo.strip():
+            return None
+        if not isinstance(descricao, str) or not descricao.strip():
+            return None
+        if isinstance(duracao, bool) or not isinstance(duracao, int):
+            return None
+        if duracao < 1 or duracao > PLANO_ETAPA_DURACAO_MAX:
+            return None
+        soma_duracoes += duracao
+        etapas_normalizadas.append({
+            'titulo': titulo.strip()[:120],
+            'duracao_semanas': duracao,
+            'descricao': descricao.strip()[:PLANO_TEXTO_MAX_CHARS],
+        })
+
+    # Coerência: soma positiva e dentro do teto; pequena diferença vs. total é ok.
+    if soma_duracoes < PLANO_DURACAO_TOTAL_MIN or soma_duracoes > PLANO_DURACAO_TOTAL_MAX:
+        return None
+
+    criterio = plano_bruto.get('criterio_sucesso')
+    recuperacao = plano_bruto.get('plano_recuperacao')
+    dica = plano_bruto.get('dica')
+    if not isinstance(criterio, str) or not criterio.strip():
+        return None
+    if not isinstance(recuperacao, str) or not recuperacao.strip():
+        return None
+    if not isinstance(dica, str) or not dica.strip():
+        return None
+
+    return {
+        'duracao_sugerida_semanas': duracao_total,
+        'criterio_sucesso': criterio.strip()[:PLANO_TEXTO_MAX_CHARS],
+        'etapas': etapas_normalizadas,
+        'plano_recuperacao': recuperacao.strip()[:PLANO_TEXTO_MAX_CHARS],
+        'dica': dica.strip()[:PLANO_TEXTO_MAX_CHARS],
+    }
+
+
 def _validar_resposta_ia(dados: dict[str, Any], periodo_solicitado: str, nivel_solicitado: str) -> dict:
-    """Valida e normaliza a saída da IA. Levanta MetaAssistantIAError se inválida."""
+    """Valida e normaliza a saída da IA. Levanta MetaAssistantIAError se inválida.
+
+    O plano estruturado é opcional na prática: se vier inválido, a sugestão
+    principal é preservada e o plano é omitido.
+    """
     if not isinstance(dados, dict):
         raise MetaAssistantIAError('Resposta da IA não é um objeto.')
 
@@ -232,7 +376,7 @@ def _validar_resposta_ia(dados: dict[str, Any], periodo_solicitado: str, nivel_s
     if not isinstance(justificativa, str) or not justificativa.strip():
         raise MetaAssistantIAError('justificativa inválida.')
 
-    return {
+    resultado = {
         'quantidade_sugerida': quantidade,
         'periodo': periodo,
         'nivel': nivel,
@@ -240,6 +384,17 @@ def _validar_resposta_ia(dados: dict[str, Any], periodo_solicitado: str, nivel_s
         'justificativa': justificativa.strip()[:500],
         'origem': 'ia',
     }
+
+    plano_normalizado = _validar_plano(dados.get('plano'))
+    if plano_normalizado is not None:
+        resultado['plano'] = plano_normalizado
+    elif 'plano' in dados:
+        logger.info(
+            'Assistente de metas: plano estruturado inválido; '
+            'mantendo apenas a sugestão principal.'
+        )
+
+    return resultado
 
 
 def _montar_contexto_ia(
@@ -267,6 +422,12 @@ def _montar_contexto_ia(
     partes.append(
         'Sugira quantidade_sugerida (>= 1), mantendo o mesmo periodo e nivel informados, '
         'respeitando o limite de segurança.'
+    )
+    partes.append(
+        'Inclua também um plano estruturado com 1 a 4 etapas curtas, duração total em '
+        'semanas, critério de sucesso, plano de recuperação e uma dica prática. '
+        'O plano deve ser compatível com a quantidade e o período sugeridos, sem '
+        'aumentos agressivos.'
     )
     return '\n'.join(partes)
 

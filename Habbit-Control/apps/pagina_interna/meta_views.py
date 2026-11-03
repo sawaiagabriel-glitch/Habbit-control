@@ -274,4 +274,7 @@ def assistente_sugerir_meta(request):
     }
     if sugestao.get('justificativa'):
         resposta['justificativa'] = sugestao['justificativa']
+    # Plano é orientação adicional da IA; nunca é persistido.
+    if sugestao.get('plano'):
+        resposta['plano'] = sugestao['plano']
     return JsonResponse(resposta)

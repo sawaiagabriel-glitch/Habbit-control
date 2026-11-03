@@ -143,6 +143,29 @@
                     </div>
                 </div>
 
+                <div id="assistant-plan" class="assistant-plan" style="display: none;" aria-live="polite">
+                    <h5 class="assistant-plan-heading">Plano sugerido</h5>
+                    <div class="assistant-plan-meta-block">
+                        <p class="assistant-plan-label">🎯 Meta</p>
+                        <p id="plan-meta-resumo" class="assistant-plan-value"></p>
+                    </div>
+                    <p id="plan-duracao" class="assistant-plan-duracao"></p>
+                    <ol id="plan-etapas" class="assistant-plan-etapas"></ol>
+                    <div class="assistant-plan-extra">
+                        <p class="assistant-plan-label">✅ Critério de sucesso</p>
+                        <p id="plan-criterio" class="assistant-plan-value"></p>
+                    </div>
+                    <div class="assistant-plan-extra">
+                        <p class="assistant-plan-label">🔄 Se você sair do ritmo</p>
+                        <p id="plan-recuperacao" class="assistant-plan-value"></p>
+                    </div>
+                    <div class="assistant-plan-extra">
+                        <p class="assistant-plan-label">💡 Dica</p>
+                        <p id="plan-dica" class="assistant-plan-value"></p>
+                    </div>
+                    <p class="assistant-plan-note">Este plano é apenas orientação e não é salvo com a meta.</p>
+                </div>
+
                 <div class="assistant-actions">
                     <button type="button" class="btn-assistant-cancel" onclick="voltarParaPerguntasAssistente()">Alterar dados / nível</button>
                     <button type="button" class="btn-assistant-use" onclick="aplicarSugestaoNoFormulario()">
@@ -287,6 +310,7 @@ function mostrarAlertaAssistente(msg) {
 function voltarParaPerguntasAssistente() {
     document.getElementById('assistant-step-form').style.display = 'block';
     document.getElementById('assistant-step-result').style.display = 'none';
+    ocultarPlanoSugerido();
     limparAlertaAssistente();
 }
 
@@ -349,6 +373,8 @@ function solicitarSugestaoAssistente() {
             badge.style.display = (body.origem === 'ia') ? 'inline-block' : 'none';
         }
 
+        renderizarPlanoSugerido(body);
+
         document.getElementById('assistant-step-form').style.display = 'none';
         document.getElementById('assistant-step-result').style.display = 'block';
     })
@@ -359,9 +385,69 @@ function solicitarSugestaoAssistente() {
     });
 }
 
+function ocultarPlanoSugerido() {
+    const bloco = document.getElementById('assistant-plan');
+    if (bloco) bloco.style.display = 'none';
+    const lista = document.getElementById('plan-etapas');
+    if (lista) lista.innerHTML = '';
+}
+
+function renderizarPlanoSugerido(body) {
+    const bloco = document.getElementById('assistant-plan');
+    if (!bloco) return;
+
+    const plano = body && body.plano;
+    const etapas = plano && Array.isArray(plano.etapas) ? plano.etapas : null;
+    if (!plano || !etapas || etapas.length < 1 || etapas.length > 4) {
+        ocultarPlanoSugerido();
+        return;
+    }
+
+    const nomePeriodo = body.periodo || '';
+    const resumoMeta = (body.nome_habito || 'Meta') + ' — ' +
+        body.quantidade_sugerida + ' vezes por ' + nomePeriodo;
+    document.getElementById('plan-meta-resumo').innerText = resumoMeta;
+    document.getElementById('plan-duracao').innerText =
+        '📅 Plano de ' + plano.duracao_sugerida_semanas + ' semanas';
+
+    const lista = document.getElementById('plan-etapas');
+    lista.innerHTML = '';
+    let semanaInicio = 1;
+    etapas.forEach((etapa, index) => {
+        const duracao = Math.max(1, parseInt(etapa.duracao_semanas, 10) || 1);
+        const semanaFim = semanaInicio + duracao - 1;
+        const li = document.createElement('li');
+        li.className = 'assistant-plan-etapa';
+
+        const tituloEl = document.createElement('p');
+        tituloEl.className = 'assistant-plan-etapa-titulo';
+        tituloEl.textContent = 'Etapa ' + (index + 1) + ' — ' + (etapa.titulo || '');
+
+        const semanasEl = document.createElement('p');
+        semanasEl.className = 'assistant-plan-etapa-semanas';
+        semanasEl.textContent = 'Semanas ' + semanaInicio + '–' + semanaFim;
+
+        const descEl = document.createElement('p');
+        descEl.className = 'assistant-plan-etapa-desc';
+        descEl.textContent = etapa.descricao || '';
+
+        li.appendChild(tituloEl);
+        li.appendChild(semanasEl);
+        li.appendChild(descEl);
+        lista.appendChild(li);
+        semanaInicio = semanaFim + 1;
+    });
+
+    document.getElementById('plan-criterio').innerText = plano.criterio_sucesso || '';
+    document.getElementById('plan-recuperacao').innerText = plano.plano_recuperacao || '';
+    document.getElementById('plan-dica').innerText = plano.dica || '';
+    bloco.style.display = 'block';
+}
+
 function aplicarSugestaoNoFormulario() {
     if (!sugestaoMetaAtual) return;
 
+    // Preenche apenas os campos atuais do formulário de Meta (plano não é persistido).
     const selectHabito = document.getElementById('id_habito');
     const inputQtd = document.getElementById('id_quantidade_minima');
     const selectPeriodo = document.getElementById('id_periodo');
@@ -735,6 +821,80 @@ function compartilharNativo(titulo, url) {
     font-size: 0.92rem;
     color: #344B50;
     line-height: 1.45;
+}
+
+/* Plano sugerido (orientação da IA; não persistido) */
+.assistant-plan {
+    margin-top: 18px;
+    padding: 16px 18px;
+    background: #FAFCFC;
+    border: 1px solid #D7E6E5;
+    border-radius: 10px;
+}
+.assistant-plan-heading {
+    margin: 0 0 12px;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #004B5E;
+}
+.assistant-plan-meta-block {
+    margin-bottom: 8px;
+}
+.assistant-plan-label {
+    margin: 0 0 2px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: #006B68;
+}
+.assistant-plan-value {
+    margin: 0;
+    font-size: 0.9rem;
+    color: #344B50;
+    line-height: 1.4;
+}
+.assistant-plan-duracao {
+    margin: 10px 0 8px;
+    font-size: 0.92rem;
+    font-weight: 600;
+    color: #17343B;
+}
+.assistant-plan-etapas {
+    margin: 0 0 14px;
+    padding: 0;
+    list-style: none;
+}
+.assistant-plan-etapa {
+    padding: 10px 0;
+    border-top: 1px solid #E5EEEF;
+}
+.assistant-plan-etapa:first-child {
+    border-top: none;
+    padding-top: 0;
+}
+.assistant-plan-etapa-titulo {
+    margin: 0 0 2px;
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: #004B5E;
+}
+.assistant-plan-etapa-semanas {
+    margin: 0 0 4px;
+    font-size: 0.78rem;
+    color: #6B7F85;
+}
+.assistant-plan-etapa-desc {
+    margin: 0;
+    font-size: 0.88rem;
+    color: #344B50;
+    line-height: 1.4;
+}
+.assistant-plan-extra {
+    margin-top: 12px;
+}
+.assistant-plan-note {
+    margin: 14px 0 0;
+    font-size: 0.75rem;
+    color: #6B7F85;
 }
 
 /* Destaque temporário no formulário */

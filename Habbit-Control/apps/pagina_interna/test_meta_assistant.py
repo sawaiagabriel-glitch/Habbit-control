@@ -11,6 +11,7 @@ from apps.pagina_interna.meta_assistant import (
     LIMITES_SEGURANCA,
     MetaAssistantIAError,
     OBJETIVO_TEXTO_MAX_CHARS,
+    _validar_plano,
     sanitizar_objetivo_texto,
     sugerir_meta,
     sugerir_meta_com_ia,
@@ -69,6 +70,42 @@ class MetaAssistantUnitTest(TestCase):
         obtido = sugerir_meta(frequencia_atual=2, nivel='equilibrada', periodo='semana')
         self.assertEqual(obtido['quantidade_sugerida'], esperado['quantidade_sugerida'])
         self.assertEqual(obtido['origem'], 'deterministico')
+        self.assertNotIn('plano', obtido)
+
+    def test_fallback_deterministico_nao_exige_plano(self):
+        res = sugerir_meta_deterministica(frequencia_atual=2, nivel='confortavel', periodo='semana')
+        self.assertEqual(res['origem'], 'deterministico')
+        self.assertNotIn('plano', res)
+        self.assertIn('quantidade_sugerida', res)
+        self.assertIn('mensagem', res)
+
+
+def _plano_valido(**overrides):
+    base = {
+        'duracao_sugerida_semanas': 6,
+        'criterio_sucesso': 'Cumprir pelo menos 80% das sessões planejadas.',
+        'etapas': [
+            {
+                'titulo': 'Adaptação',
+                'duracao_semanas': 2,
+                'descricao': 'Mantenha 2 sessões obrigatórias e uma terceira opcional.',
+            },
+            {
+                'titulo': 'Consolidação',
+                'duracao_semanas': 2,
+                'descricao': 'Realize 3 sessões por semana.',
+            },
+            {
+                'titulo': 'Manutenção',
+                'duracao_semanas': 2,
+                'descricao': 'Mantenha 3 sessões por semana com consistência.',
+            },
+        ],
+        'plano_recuperacao': 'Se não cumprir uma semana, retome a etapa anterior.',
+        'dica': 'Priorize consistência antes de aumentar quantidade.',
+    }
+    base.update(overrides)
+    return base
 
 
 def _resposta_ia_mock(payload: dict) -> MagicMock:
@@ -76,6 +113,69 @@ def _resposta_ia_mock(payload: dict) -> MagicMock:
     response.output_text = json.dumps(payload)
     response.output = []
     return response
+
+
+class MetaAssistantPlanoValidacaoTest(TestCase):
+    """Validação isolada do plano estruturado (falha soft)."""
+
+    def test_plano_valido_e_aceito(self):
+        plano = _validar_plano(_plano_valido())
+        self.assertIsNotNone(plano)
+        self.assertEqual(plano['duracao_sugerida_semanas'], 6)
+        self.assertEqual(len(plano['etapas']), 3)
+        self.assertIn('criterio_sucesso', plano)
+
+    def test_plano_aceita_entre_1_e_4_etapas(self):
+        for n in (1, 2, 3, 4):
+            with self.subTest(n=n):
+                etapas = [
+                    {
+                        'titulo': f'Etapa {i}',
+                        'duracao_semanas': 1,
+                        'descricao': f'Descrição {i}',
+                    }
+                    for i in range(1, n + 1)
+                ]
+                plano = _validar_plano(_plano_valido(
+                    duracao_sugerida_semanas=n,
+                    etapas=etapas,
+                ))
+                self.assertIsNotNone(plano)
+                self.assertEqual(len(plano['etapas']), n)
+
+    def test_plano_rejeita_zero_ou_mais_de_quatro_etapas(self):
+        self.assertIsNone(_validar_plano(_plano_valido(etapas=[])))
+        etapas_cinco = [
+            {'titulo': f'E{i}', 'duracao_semanas': 1, 'descricao': f'D{i}'}
+            for i in range(5)
+        ]
+        self.assertIsNone(_validar_plano(_plano_valido(
+            duracao_sugerida_semanas=5,
+            etapas=etapas_cinco,
+        )))
+
+    def test_pequena_diferenca_entre_soma_e_duracao_total_nao_invalida(self):
+        # Soma das etapas = 5; duração sugerida = 6 — diferença pequena ok.
+        plano = _validar_plano(_plano_valido(
+            duracao_sugerida_semanas=6,
+            etapas=[
+                {'titulo': 'A', 'duracao_semanas': 2, 'descricao': 'Primeira'},
+                {'titulo': 'B', 'duracao_semanas': 3, 'descricao': 'Segunda'},
+            ],
+        ))
+        self.assertIsNotNone(plano)
+        self.assertEqual(plano['duracao_sugerida_semanas'], 6)
+        self.assertEqual(sum(e['duracao_semanas'] for e in plano['etapas']), 5)
+
+    def test_etapa_invalida_rejeita_apenas_o_plano(self):
+        self.assertIsNone(_validar_plano(_plano_valido(
+            etapas=[{'titulo': '', 'duracao_semanas': 2, 'descricao': 'x'}],
+        )))
+        self.assertIsNone(_validar_plano(_plano_valido(
+            etapas=[{'titulo': 'A', 'duracao_semanas': 0, 'descricao': 'x'}],
+        )))
+        self.assertIsNone(_validar_plano(None))
+        self.assertIsNone(_validar_plano('nao-e-objeto'))
 
 
 @override_settings(OPENAI_API_KEY='sk-test-fake-key-not-real', OPENAI_META_ASSISTANT_MODEL='gpt-test-model')
@@ -90,6 +190,11 @@ class MetaAssistantIATest(TestCase):
             'mensagem': 'Uma meta de 3 vezes por semana é um avanço gradual.',
             'justificativa': 'Aumento moderado em relação às 2 vezes atuais.',
         }
+        base.update(overrides)
+        return base
+
+    def _payload_com_plano(self, **overrides):
+        base = self._payload_valido(plano=_plano_valido())
         base.update(overrides)
         return base
 
@@ -261,6 +366,56 @@ class MetaAssistantIATest(TestCase):
         )
         with self.assertRaises(MetaAssistantIAError):
             sugerir_meta_com_ia(frequencia_atual=2, nivel='equilibrada', periodo='semana')
+
+    @patch('openai.OpenAI')
+    def test_ia_retorna_plano_valido(self, mock_openai_cls):
+        client = MagicMock()
+        mock_openai_cls.return_value = client
+        client.responses.create.return_value = _resposta_ia_mock(self._payload_com_plano())
+
+        res = sugerir_meta(
+            frequencia_atual=2,
+            nivel='equilibrada',
+            periodo='semana',
+            nome_habito='Corrida',
+        )
+        self.assertEqual(res['origem'], 'ia')
+        self.assertEqual(res['quantidade_sugerida'], 3)
+        self.assertIn('plano', res)
+        self.assertEqual(res['plano']['duracao_sugerida_semanas'], 6)
+        self.assertEqual(len(res['plano']['etapas']), 3)
+        self.assertTrue(1 <= len(res['plano']['etapas']) <= 4)
+
+    @patch('openai.OpenAI')
+    def test_plano_com_etapas_invalidas_nao_quebra_sugestao_principal(self, mock_openai_cls):
+        client = MagicMock()
+        mock_openai_cls.return_value = client
+        client.responses.create.return_value = _resposta_ia_mock(
+            self._payload_com_plano(plano=_plano_valido(etapas=[]))
+        )
+
+        res = sugerir_meta(
+            frequencia_atual=2,
+            nivel='equilibrada',
+            periodo='semana',
+        )
+        self.assertEqual(res['origem'], 'ia')
+        self.assertEqual(res['quantidade_sugerida'], 3)
+        self.assertEqual(res['periodo'], 'semana')
+        self.assertIn('mensagem', res)
+        self.assertNotIn('plano', res)
+
+    @patch('openai.OpenAI')
+    def test_campos_obrigatorios_da_meta_continuam_validados(self, mock_openai_cls):
+        client = MagicMock()
+        mock_openai_cls.return_value = client
+        # Plano válido não salva a sugestão se quantidade for inválida.
+        client.responses.create.return_value = _resposta_ia_mock(
+            self._payload_com_plano(quantidade_sugerida=0)
+        )
+        res = sugerir_meta(frequencia_atual=2, nivel='equilibrada', periodo='semana')
+        self.assertEqual(res['origem'], 'deterministico')
+        self.assertNotIn('plano', res)
 
 
 @override_settings(OPENAI_API_KEY='')
@@ -514,8 +669,52 @@ class MetaAssistantEndpointTest(TestCase):
         self.assertContains(res, 'assistente-modal')
         self.assertContains(res, 'assistant-objetivo')
         self.assertContains(res, 'Usar esta meta')
+        self.assertContains(res, 'assistant-plan')
+        self.assertContains(res, 'Plano sugerido')
+        self.assertContains(res, 'renderizarPlanoSugerido')
         self.assertContains(res, f'data-freq-valor="{self.habito_positivo.frequencia_atual_valor}"')
         self.assertContains(res, f'data-freq-periodo="{self.habito_positivo.frequencia_atual_periodo}"')
+
+    def test_usar_esta_meta_preenche_apenas_campos_existentes(self):
+        self.client.post(reverse('login'), {
+            'email': self.cliente.email,
+            'password': 'senha123',
+        })
+        res = self.client.get(reverse('metas'))
+        self.assertEqual(res.status_code, 200)
+        conteudo = res.content.decode('utf-8')
+        # Botão continua mapeando só habito / quantidade / periodo
+        self.assertIn('aplicarSugestaoNoFormulario', conteudo)
+        self.assertIn("getElementById('id_habito')", conteudo)
+        self.assertIn("getElementById('id_quantidade_minima')", conteudo)
+        self.assertIn("getElementById('id_periodo')", conteudo)
+        self.assertIn('sugestaoMetaAtual.quantidade_sugerida', conteudo)
+        self.assertIn('sugestaoMetaAtual.periodo', conteudo)
+        # Não tenta gravar campos do plano no formulário
+        self.assertNotIn("getElementById('id_plano')", conteudo)
+        self.assertNotIn('sugestaoMetaAtual.plano', conteudo.split('function aplicarSugestaoNoFormulario')[1].split('function ')[0])
+
+    def test_endpoint_fallback_responde_sem_plano(self):
+        self.client.post(reverse('login'), {
+            'email': self.cliente.email,
+            'password': 'senha123',
+        })
+        res = self.client.post(
+            reverse('assistente_sugerir_meta'),
+            data=json.dumps({
+                'habito_id': self.habito_positivo.id,
+                'frequencia_atual': 2,
+                'periodo': 'semana',
+                'nivel': 'equilibrada',
+            }),
+            content_type='application/json',
+        )
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertTrue(data['sucesso'])
+        self.assertEqual(data.get('origem'), 'deterministico')
+        self.assertNotIn('plano', data)
+        self.assertIn('quantidade_sugerida', data)
 
     def test_criacao_normal_compartilhamento_e_parceiro_continuam_intactos(self):
         self.client.post(reverse('login'), {
@@ -579,6 +778,7 @@ class MetaAssistantEndpointIATest(TestCase):
             'nivel': 'equilibrada',
             'mensagem': 'Leia 4 vezes por semana para evoluir com constância.',
             'justificativa': 'Aumento gradual e sustentável.',
+            'plano': _plano_valido(),
         })
 
         self.client.post(reverse('login'), {
@@ -602,6 +802,8 @@ class MetaAssistantEndpointIATest(TestCase):
         self.assertTrue(data['sucesso'])
         self.assertEqual(data['origem'], 'ia')
         self.assertEqual(data['quantidade_sugerida'], 4)
+        self.assertIn('plano', data)
+        self.assertEqual(len(data['plano']['etapas']), 3)
         self.assertEqual(Meta.objects.count(), metas_antes)
 
         kwargs = client.responses.create.call_args.kwargs
@@ -609,3 +811,42 @@ class MetaAssistantEndpointIATest(TestCase):
         self.assertNotIn(self.cliente.email, input_enviado)
         self.assertNotIn('senha123', input_enviado)
         self.assertNotIn(self.cliente.nome_completo, input_enviado)
+
+    @patch('openai.OpenAI')
+    def test_plano_nao_e_persistido_no_banco(self, mock_openai_cls):
+        client = MagicMock()
+        mock_openai_cls.return_value = client
+        client.responses.create.return_value = _resposta_ia_mock({
+            'quantidade_sugerida': 3,
+            'periodo': 'semana',
+            'nivel': 'equilibrada',
+            'mensagem': 'Leia 3 vezes por semana.',
+            'justificativa': 'Avanço gradual.',
+            'plano': _plano_valido(
+                criterio_sucesso='Texto unico do plano XYZ123 nao deve ir ao banco.',
+            ),
+        })
+
+        self.client.post(reverse('login'), {
+            'email': self.cliente.email,
+            'password': 'senha123',
+        })
+        metas_antes = Meta.objects.count()
+        res = self.client.post(
+            reverse('assistente_sugerir_meta'),
+            data=json.dumps({
+                'habito_id': self.habito.id,
+                'frequencia_atual': 2,
+                'periodo': 'semana',
+                'nivel': 'equilibrada',
+            }),
+            content_type='application/json',
+        )
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertIn('plano', data)
+        self.assertEqual(Meta.objects.count(), metas_antes)
+        for meta in Meta.objects.all():
+            serializado = json.dumps(meta.__dict__, default=str)
+            self.assertNotIn('XYZ123', serializado)
+            self.assertNotIn('plano_recuperacao', serializado)
