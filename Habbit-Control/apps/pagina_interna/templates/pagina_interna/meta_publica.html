@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Meta: {{ nome_habito }} - Habit Control</title>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'login_cadastro_app/css/style.css' %}">
+    <link rel="stylesheet" href="{% static 'pagina_interna/css/style.css' %}">
+    <style>
+        body.public-body {
+            background-color: #F4F7F9;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 24px 16px;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            color: #17343B;
+            margin: 0;
+        }
+        .public-container {
+            width: 100%;
+            max-width: 520px;
+        }
+        .public-brand {
+            text-align: center;
+            margin-bottom: 24px;
+        }
+        .public-brand img {
+            max-width: 180px;
+            height: auto;
+            border-radius: 8px;
+        }
+        .public-card {
+            background: #FFFFFF;
+            border-radius: 16px;
+            padding: 32px;
+            box-shadow: 0 10px 30px rgba(0, 75, 94, 0.08);
+            border: 1px solid #E8EEF0;
+        }
+        .public-card-header {
+            border-bottom: 1px solid #EDF2F4;
+            padding-bottom: 20px;
+            margin-bottom: 24px;
+        }
+        .public-badge {
+            display: inline-block;
+            font-size: 0.78rem;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            font-weight: 700;
+            color: #006B68;
+            background: #E6F4F3;
+            padding: 4px 12px;
+            border-radius: 999px;
+            margin-bottom: 12px;
+        }
+        .public-meta-title {
+            font-size: 1.6rem;
+            font-weight: 700;
+            color: #004B5E;
+            margin: 0 0 8px;
+            line-height: 1.25;
+            word-break: break-word;
+        }
+        .public-meta-goal {
+            font-size: 1rem;
+            color: #526367;
+            margin: 0;
+        }
+        .public-meta-goal strong {
+            color: #17343B;
+        }
+        .public-progress-section {
+            margin: 24px 0;
+        }
+        .public-progress-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            margin-bottom: 10px;
+        }
+        .public-progress-label {
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: #526367;
+        }
+        .public-progress-numbers {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: #004B5E;
+        }
+        .public-progress-percent {
+            font-size: 0.9rem;
+            color: #006B68;
+            font-weight: 600;
+            margin-left: 6px;
+        }
+        .public-progress-bar-bg {
+            width: 100%;
+            height: 14px;
+            background-color: #E8EEF0;
+            border-radius: 999px;
+            overflow: hidden;
+        }
+        .public-progress-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #004B5E 0%, #10B981 100%);
+            border-radius: 999px;
+            transition: width 0.4s ease;
+        }
+        .public-meta-details {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-top: 24px;
+            padding-top: 20px;
+            border-top: 1px solid #EDF2F4;
+        }
+        .public-detail-item {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .public-detail-label {
+            font-size: 0.82rem;
+            color: #7A898D;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            font-weight: 600;
+        }
+        .public-detail-value {
+            font-size: 1.05rem;
+            font-weight: 700;
+            color: #17343B;
+        }
+        .public-footer {
+            text-align: center;
+            margin-top: 24px;
+            font-size: 0.9rem;
+            color: #7A898D;
+        }
+    </style>
+</head>
+<body class="public-body">
+    <div class="public-container">
+        <div class="public-brand">
+            <img src="{% static 'login_cadastro_app/img/habit_control_azul.jpg' %}" alt="Habbit-Control Logo">
+        </div>
+        
+        <main class="public-card">
+            <header class="public-card-header">
+                <span class="public-badge">Meta Compartilhada</span>
+                <h1 class="public-meta-title">{{ nome_habito }}</h1>
+                <p class="public-meta-goal">
+                    Objetivo: <strong>{{ quantidade_minima }} atividades por {{ periodo|lower }}</strong>
+                </p>
+            </header>
+
+            <section class="public-progress-section" aria-label="Progresso da Meta">
+                <div class="public-progress-header">
+                    <span class="public-progress-label">Progresso do período</span>
+                    <span class="public-progress-numbers">
+                        {{ progresso }} / {{ quantidade_minima }}
+                        <span class="public-progress-percent">({{ percentual }}%)</span>
+                    </span>
+                </div>
+                <div class="public-progress-bar-bg" role="progressbar" aria-valuenow="{{ percentual }}" aria-valuemin="0" aria-valuemax="100">
+                    <div class="public-progress-bar-fill" style="width: {{ percentual_css }}%;"></div>
+                </div>
+            </section>
+
+            <footer class="public-meta-details">
+                <div class="public-detail-item">
+                    <span class="public-detail-label">Status do Período</span>
+                    <span class="public-detail-value">{{ estado }}</span>
+                </div>
+                {% if streak is not None %}
+                <div class="public-detail-item">
+                    <span class="public-detail-label">Sequência Atual</span>
+                    <span class="public-detail-value">{{ streak }} período(s)</span>
+                </div>
+                {% endif %}
+            </footer>
+        </main>
+
+        <footer class="public-footer">
+            <p>Meta criada no <strong>Habbit-Control</strong></p>
+        </footer>
+    </div>
+</body>
+</html>

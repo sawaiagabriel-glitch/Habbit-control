@@ -1,4 +1,5 @@
 from datetime import date
+import secrets
 
 from django.db import models
 from apps.login_cadastro_app.models import Cliente
@@ -142,6 +143,18 @@ class Meta(models.Model):
         verbose_name="Parceiros de acompanhamento",
     )
     streak = models.PositiveIntegerField(default=0, verbose_name="Sequência atual")
+    compartilhamento_ativo = models.BooleanField(
+        default=False,
+        verbose_name="Compartilhamento público ativo",
+    )
+    token_publico = models.CharField(
+        max_length=64,
+        unique=True,
+        null=True,
+        blank=True,
+        db_index=True,
+        verbose_name="Token público",
+    )
     data_criacao = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -166,6 +179,23 @@ class Meta(models.Model):
         """Executa validação de domínio antes de persistir a meta."""
         self.full_clean()
         return super().save(*args, **kwargs)
+
+    def ativar_compartilhamento(self):
+        """Ativa o compartilhamento público, gerando token único se ainda não existir."""
+        if not self.token_publico:
+            while True:
+                novo_token = secrets.token_urlsafe(32)
+                if not Meta.objects.filter(token_publico=novo_token).exists():
+                    self.token_publico = novo_token
+                    break
+        self.compartilhamento_ativo = True
+        self.save()
+        return self.token_publico
+
+    def desativar_compartilhamento(self):
+        """Desativa o compartilhamento público mantendo o token gerado para reutilização."""
+        self.compartilhamento_ativo = False
+        self.save()
 
 
 class MetaCiclo(models.Model):

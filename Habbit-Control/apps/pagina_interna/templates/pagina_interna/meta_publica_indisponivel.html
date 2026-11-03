@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Meta Indisponível - Habit Control</title>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'login_cadastro_app/css/style.css' %}">
+    <link rel="stylesheet" href="{% static 'pagina_interna/css/style.css' %}">
+    <style>
+        body.public-body {
+            background-color: #F4F7F9;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 24px 16px;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            color: #17343B;
+            margin: 0;
+        }
+        .public-container {
+            width: 100%;
+            max-width: 480px;
+        }
+        .public-brand {
+            text-align: center;
+            margin-bottom: 24px;
+        }
+        .public-brand img {
+            max-width: 180px;
+            height: auto;
+            border-radius: 8px;
+        }
+        .public-card {
+            background: #FFFFFF;
+            border-radius: 16px;
+            padding: 36px 28px;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0, 75, 94, 0.08);
+            border: 1px solid #E8EEF0;
+        }
+        .public-icon {
+            width: 56px;
+            height: 56px;
+            margin: 0 auto 16px;
+            border-radius: 50%;
+            background-color: #FDF2F2;
+            color: #DC2626;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .public-title {
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: #004B5E;
+            margin: 0 0 10px;
+        }
+        .public-message {
+            font-size: 0.95rem;
+            color: #637276;
+            line-height: 1.5;
+            margin: 0;
+        }
+        .public-footer {
+            text-align: center;
+            margin-top: 24px;
+            font-size: 0.9rem;
+            color: #7A898D;
+        }
+    </style>
+</head>
+<body class="public-body">
+    <div class="public-container">
+        <div class="public-brand">
+            <img src="{% static 'login_cadastro_app/img/habit_control_azul.jpg' %}" alt="Habbit-Control Logo">
+        </div>
+        
+        <main class="public-card">
+            <div class="public-icon" aria-hidden="true">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="12" y1="8" x2="12" y2="12"></line>
+                    <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                </svg>
+            </div>
+            <h1 class="public-title">Meta indisponível</h1>
+            <p class="public-message">
+                Este link de compartilhamento não existe ou foi desativado pelo proprietário da meta.
+            </p>
+        </main>
+
+        <footer class="public-footer">
+            <p>Habbit-Control</p>
+        </footer>
+    </div>
+</body>
+</html>

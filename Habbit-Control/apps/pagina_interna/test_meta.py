@@ -207,6 +207,77 @@ class MetaProgressTest(TestCase):
         self.assertContains(response, 'Alongamento')
         self.assertContains(response, '0 / 3')
 
+    def test_formulario_lista_apenas_habitos_elegiveis_do_cliente(self):
+        from apps.pagina_interna.forms import MetaForm
+
+        outro_cliente = Cliente.objects.create(
+            nome_completo='Outro Cliente',
+            idade=40,
+            email='outro.habitos@teste.com',
+            password='senha123',
+            lgpd=True,
+        )
+        habito_livre = Habito.objects.create(
+            cliente=self.cliente,
+            tipo_habito='positivo',
+            nome_habito='Habito Livre',
+            frequencia_atual_valor=1,
+            frequencia_atual_periodo='dia',
+            frequencia_desejada_valor=1,
+            frequencia_desejada_periodo='dia',
+        )
+        habito_negativo = Habito.objects.create(
+            cliente=self.cliente,
+            tipo_habito='negativo',
+            nome_habito='Habito Negativo',
+            frequencia_atual_valor=1,
+            frequencia_atual_periodo='dia',
+            frequencia_desejada_valor=0,
+            frequencia_desejada_periodo='dia',
+        )
+        habito_com_meta = self.habito  # já possui meta no setUp
+        habito_alheio = Habito.objects.create(
+            cliente=outro_cliente,
+            tipo_habito='positivo',
+            nome_habito='Habito Alheio',
+            frequencia_atual_valor=1,
+            frequencia_atual_periodo='dia',
+            frequencia_desejada_valor=1,
+            frequencia_desejada_periodo='dia',
+        )
+
+        form = MetaForm(cliente=self.cliente)
+        ids = set(form.fields['habito'].queryset.values_list('id', flat=True))
+        self.assertIn(habito_livre.id, ids)
+        self.assertNotIn(habito_negativo.id, ids)
+        self.assertNotIn(habito_com_meta.id, ids)
+        self.assertNotIn(habito_alheio.id, ids)
+        self.assertEqual(
+            form.fields['habito'].label_from_instance(habito_livre),
+            'Habito Livre',
+        )
+
+        self.client.post(reverse('login'), {
+            'email': self.cliente.email,
+            'password': 'senha123',
+        })
+        response = self.client.get(reverse('metas'))
+        self.assertEqual(response.status_code, 200)
+        select_html = response.context['form']['habito'].as_widget()
+        self.assertIn(f'value="{habito_livre.id}"', select_html)
+        self.assertIn('Habito Livre', select_html)
+        self.assertNotIn(f'value="{habito_negativo.id}"', select_html)
+        self.assertNotIn(f'value="{habito_alheio.id}"', select_html)
+        self.assertNotIn(f'value="{habito_com_meta.id}"', select_html)
+
+        response_create = self.client.post(reverse('metas'), {
+            'habito': habito_livre.id,
+            'quantidade_minima': 2,
+            'periodo': 'dia',
+        })
+        self.assertRedirects(response_create, reverse('metas'))
+        self.assertTrue(Meta.objects.filter(habito=habito_livre, quantidade_minima=2).exists())
+
     def test_nao_permite_meta_para_habito_negativo_ou_meta_duplicada(self):
         from apps.pagina_interna.forms import MetaForm
 

@@ -51,7 +51,7 @@ class ClienteFormTest(TestCase):
         self.assertIn('email', form.fields)
         self.assertIn('password', form.fields)
         self.assertIn('lgpd', form.fields)
-        self.assertIn('profissao', form.fields)
+        self.assertNotIn('profissao', form.fields)
 
     def test_formulario_exige_lgpd(self):
         form = ClienteForm()
@@ -125,9 +125,9 @@ class CadastroClienteViewTest(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertNotContains(response, '000.000.000-00')
         self.assertNotContains(response, 'id_cpf')
-        self.assertContains(response, 'id_profissao')
+        self.assertNotContains(response, 'id_profissao')
 
-    def test_cadastro_com_csrf_profissao_login_e_perfil(self):
+    def test_cadastro_com_csrf_login_e_dashboard(self):
         client = Client(enforce_csrf_checks=True)
         response_cadastro = client.get(self.cadastro_url)
         self.assertEqual(response_cadastro.status_code, 200)
@@ -141,13 +141,14 @@ class CadastroClienteViewTest(TestCase):
             'idade': 32,
             'email': 'carla@exemplo.com',
             'password': 'SenhaSegura#2026',
-            'profissao': 'Arquiteta',
             'lgpd': 'on',
         })
         self.assertRedirects(response, reverse('login'))
 
         cliente = Cliente.objects.get(email='carla@exemplo.com')
-        self.assertEqual(cliente.profissao, 'Arquiteta')
+        self.assertFalse(
+            any(f.name == 'profissao' for f in Cliente._meta.get_fields())
+        )
 
         response_login_form = client.get(reverse('login'))
         csrf_token = response_login_form.cookies['csrftoken'].value
@@ -156,20 +157,9 @@ class CadastroClienteViewTest(TestCase):
             'email': cliente.email,
             'password': 'SenhaSegura#2026',
         })
-        self.assertRedirects(response_login, reverse('alterar_dados'))
-        response_perfil = client.get(reverse('alterar_dados'))
-        self.assertEqual(response_perfil.status_code, 200)
-        self.assertContains(response_perfil, 'Arquiteta')
-
-        response_update = client.post(
-            reverse('update_cliente'),
-            data='{"field":"profissao","value":"Urbanista"}',
-            content_type='application/json',
-            HTTP_X_CSRFTOKEN=csrf_token,
-        )
-        self.assertEqual(response_update.status_code, 200)
-        cliente.refresh_from_db()
-        self.assertEqual(cliente.profissao, 'Urbanista')
+        self.assertRedirects(response_login, reverse('dashboard'))
+        response_dashboard = client.get(reverse('dashboard'))
+        self.assertEqual(response_dashboard.status_code, 200)
 
     def test_post_cadastro_sucesso(self):
         data = {

@@ -12,7 +12,13 @@
     {% if messages %}<div class="messages-toast-top">{% for message in messages %}<div class="message-toast-top message-toast-{{ message.tags }}">{{ message }}</div>{% endfor %}</div>{% endif %}
 
     <section class="info-card goal-form-card">
-        <h2 class="section-title">Definir uma meta</h2>
+        <div class="goal-form-header-wrap">
+            <h2 class="section-title">Definir uma meta</h2>
+            <button type="button" class="btn-assistant-open" onclick="abrirAssistenteMetas()">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></svg>
+                <span>Me ajude a criar uma meta</span>
+            </button>
+        </div>
         <form method="post" class="goal-form">
             {% csrf_token %}
             {% for field in form %}
@@ -27,6 +33,114 @@
         </form>
     </section>
 
+    <!-- Modal do Assistente de Metas -->
+    <div id="assistente-modal" class="assistant-modal" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="assistant-modal-title">
+        <div class="assistant-modal-backdrop" onclick="fecharAssistenteMetas()"></div>
+        <div class="assistant-modal-card">
+            <div class="assistant-modal-header">
+                <div class="assistant-header-title-wrap">
+                    <span class="assistant-avatar" aria-hidden="true">🤖</span>
+                    <div>
+                        <h3 id="assistant-modal-title" class="assistant-modal-title">Assistente de Metas</h3>
+                        <p class="assistant-modal-sub">Vou te ajudar a definir uma meta realista para o seu hábito.</p>
+                    </div>
+                </div>
+                <button type="button" class="assistant-close-btn" onclick="fecharAssistenteMetas()" aria-label="Fechar assistente">&times;</button>
+            </div>
+
+            <div id="assistant-alert" class="assistant-alert" style="display: none;"></div>
+
+            <!-- Passo 1: Formulário de Perguntas -->
+            <div id="assistant-step-form" class="assistant-body">
+                <div class="assistant-field">
+                    <label for="assistant-habito" class="assistant-label">Qual hábito você quer transformar em meta?</label>
+                    <select id="assistant-habito" class="assistant-select" onchange="aoSelecionarHabitoAssistente()">
+                        <option value="">Selecione um hábito...</option>
+                        {% for h in habitos_assistente %}
+                            <option value="{{ h.id }}" data-freq-valor="{{ h.frequencia_valor }}" data-freq-periodo="{{ h.frequencia_periodo }}">{{ h.nome }}</option>
+                        {% empty %}
+                            <option value="" disabled>Nenhum hábito positivo sem meta disponível.</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="assistant-grid-2">
+                    <div class="assistant-field">
+                        <label for="assistant-frequencia" class="assistant-label">Quantas vezes você costuma realizar atualmente?</label>
+                        <input type="number" id="assistant-frequencia" class="assistant-input" min="1" value="2" placeholder="Ex: 2">
+                    </div>
+
+                    <div class="assistant-field">
+                        <label for="assistant-periodo" class="assistant-label">Com que frequência?</label>
+                        <select id="assistant-periodo" class="assistant-select">
+                            <option value="dia">Diariamente (por dia)</option>
+                            <option value="semana" selected>Semanalmente (por semana)</option>
+                            <option value="mes">Mensalmente (por mês)</option>
+                            <option value="ano">Anualmente (por ano)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="assistant-field">
+                    <label class="assistant-label">Qual nível você prefere para o seu objetivo?</label>
+                    <div class="assistant-levels">
+                        <label class="assistant-level-card">
+                            <input type="radio" name="assistant-level" value="confortavel">
+                            <div class="level-content">
+                                <span class="level-badge level-badge-confortavel">Confortável</span>
+                                <span class="level-desc">Ideal para manter e criar consistência</span>
+                            </div>
+                        </label>
+
+                        <label class="assistant-level-card">
+                            <input type="radio" name="assistant-level" value="equilibrada" checked>
+                            <div class="level-content">
+                                <span class="level-badge level-badge-equilibrada">Equilibrada</span>
+                                <span class="level-desc">Aumento moderado e sustentável</span>
+                            </div>
+                        </label>
+
+                        <label class="assistant-level-card">
+                            <input type="radio" name="assistant-level" value="desafiadora">
+                            <div class="level-content">
+                                <span class="level-badge level-badge-desafiadora">Desafiadora</span>
+                                <span class="level-desc">Foco em acelerar e atingir novos patamares</span>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="assistant-actions">
+                    <button type="button" class="btn-assistant-cancel" onclick="fecharAssistenteMetas()">Cancelar</button>
+                    <button type="button" class="btn-assistant-submit" id="btn-gerar-sugestao" onclick="solicitarSugestaoAssistente()">
+                        <span>Gerar sugestão de meta</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Passo 2: Exibição da Sugestão -->
+            <div id="assistant-step-result" class="assistant-body" style="display: none;">
+                <div class="assistant-suggestion-card">
+                    <div class="suggestion-icon" aria-hidden="true">🎯</div>
+                    <div class="suggestion-details">
+                        <span class="suggestion-subtitle">Minha sugestão para você:</span>
+                        <h4 id="suggestion-title" class="suggestion-title">Academia</h4>
+                        <p id="suggestion-highlight" class="suggestion-highlight">4 vezes por semana</p>
+                        <p id="suggestion-text" class="suggestion-text">Texto explicativo da meta...</p>
+                    </div>
+                </div>
+
+                <div class="assistant-actions">
+                    <button type="button" class="btn-assistant-cancel" onclick="voltarParaPerguntasAssistente()">Alterar dados / nível</button>
+                    <button type="button" class="btn-assistant-use" onclick="aplicarSugestaoNoFormulario()">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                        <span>Usar esta meta</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <section class="goal-list">
         <h2 class="section-title">Metas dos meus hábitos</h2>
         {% for meta in metas %}
@@ -40,10 +154,51 @@
                 <progress class="goal-progress" value="{{ ciclo.percentual|default:0 }}" max="100" aria-label="{{ ciclo.percentual|default:0 }}% da meta"></progress>
                 <p class="goal-streak">Sequência atual: <strong>{{ meta.streak }}</strong> período(s)</p>
                 {% if meta.parceiros.exists %}<p class="goal-sharing">Partilhada com: {% for parceiro in meta.parceiros.all %}{{ parceiro.nome_completo }}{% if not forloop.last %}, {% endif %}{% endfor %}</p>{% endif %}
-                <form method="post" action="{% url 'excluir_meta' meta.id %}" class="goal-delete-form">
-                    {% csrf_token %}
-                    <button type="submit" class="goal-delete-button">Excluir meta</button>
-                </form>
+
+                <!-- Compartilhamento Público -->
+                <div class="goal-public-sharing-card">
+                    {% if meta.compartilhamento_ativo and meta.token_publico %}
+                        <div class="goal-public-header">
+                            <span class="goal-public-badge">Link público ativo</span>
+                        </div>
+                        <div class="goal-public-url-box">
+                            <input type="text" readonly value="{{ request.scheme }}://{{ request.get_host }}{% url 'meta_publica' meta.token_publico %}" id="public-link-{{ meta.id }}" class="goal-public-input" aria-label="Link público da meta">
+                        </div>
+                        <div class="goal-public-actions">
+                            <button type="button" class="btn-share-copy" onclick="copiarLinkPublico('public-link-{{ meta.id }}', this)">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                                <span>Copiar link</span>
+                            </button>
+                            <a href="https://api.whatsapp.com/send?text={{ 'Acompanhe a minha meta de '|urlencode }}{{ meta.habito.nome_habito|urlencode }}{{ ' no Habbit-Control: '|urlencode }}{{ request.scheme }}://{{ request.get_host }}{% url 'meta_publica' meta.token_publico %}" target="_blank" rel="noopener noreferrer" class="btn-share-whatsapp">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z"/></svg>
+                                <span>WhatsApp</span>
+                            </a>
+                            <button type="button" class="btn-share-native" onclick="compartilharNativo('{{ meta.habito.nome_habito|escapejs }}', '{{ request.scheme }}://{{ request.get_host }}{% url 'meta_publica' meta.token_publico %}')">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>
+                                <span>Compartilhar</span>
+                            </button>
+                            <form method="post" action="{% url 'desativar_compartilhamento_meta' meta.id %}" class="goal-share-toggle-form">
+                                {% csrf_token %}
+                                <button type="submit" class="btn-share-disable">Desativar link</button>
+                            </form>
+                        </div>
+                    {% else %}
+                        <form method="post" action="{% url 'ativar_compartilhamento_meta' meta.id %}" class="goal-share-toggle-form">
+                            {% csrf_token %}
+                            <button type="submit" class="btn-share-enable">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>
+                                <span>Compartilhar Meta</span>
+                            </button>
+                        </form>
+                    {% endif %}
+                </div>
+
+                <div class="goal-actions-footer">
+                    <form method="post" action="{% url 'excluir_meta' meta.id %}" class="goal-delete-form">
+                        {% csrf_token %}
+                        <button type="submit" class="goal-delete-button">Excluir meta</button>
+                    </form>
+                </div>
             </article>
             {% endwith %}
         {% empty %}
@@ -51,5 +206,608 @@
         {% endfor %}
     </section>
 </div>
+
+<script>
+let sugestaoMetaAtual = null;
+
+function abrirAssistenteMetas() {
+    const modal = document.getElementById('assistente-modal');
+    if (!modal) return;
+    limparAlertaAssistente();
+    voltarParaPerguntasAssistente();
+    modal.style.display = 'flex';
+
+    // Se já houver um hábito selecionado no formulário principal, sincroniza
+    const selectHabitoForm = document.getElementById('id_habito');
+    const selectHabitoAssistente = document.getElementById('assistant-habito');
+    if (selectHabitoForm && selectHabitoForm.value && selectHabitoAssistente) {
+        selectHabitoAssistente.value = selectHabitoForm.value;
+        aoSelecionarHabitoAssistente();
+    } else if (selectHabitoAssistente && selectHabitoAssistente.options.length > 1) {
+        // Seleciona a primeira opção válida se nenhuma estiver selecionada
+        if (!selectHabitoAssistente.value) {
+            selectHabitoAssistente.selectedIndex = 1;
+            aoSelecionarHabitoAssistente();
+        }
+    }
+}
+
+function fecharAssistenteMetas() {
+    const modal = document.getElementById('assistente-modal');
+    if (modal) modal.style.display = 'none';
+}
+
+function aoSelecionarHabitoAssistente() {
+    const select = document.getElementById('assistant-habito');
+    if (!select || !select.value) return;
+    const option = select.options[select.selectedIndex];
+    const freqValor = option.getAttribute('data-freq-valor');
+    const freqPeriodo = option.getAttribute('data-freq-periodo');
+
+    if (freqValor) {
+        const inputFreq = document.getElementById('assistant-frequencia');
+        if (inputFreq) inputFreq.value = freqValor;
+    }
+    if (freqPeriodo) {
+        const selectPeriodo = document.getElementById('assistant-periodo');
+        if (selectPeriodo) selectPeriodo.value = freqPeriodo;
+    }
+    limparAlertaAssistente();
+}
+
+function limparAlertaAssistente() {
+    const alerta = document.getElementById('assistant-alert');
+    if (alerta) {
+        alerta.style.display = 'none';
+        alerta.innerText = '';
+    }
+}
+
+function mostrarAlertaAssistente(msg) {
+    const alerta = document.getElementById('assistant-alert');
+    if (alerta) {
+        alerta.innerText = msg;
+        alerta.style.display = 'block';
+    }
+}
+
+function voltarParaPerguntasAssistente() {
+    document.getElementById('assistant-step-form').style.display = 'block';
+    document.getElementById('assistant-step-result').style.display = 'none';
+    limparAlertaAssistente();
+}
+
+function solicitarSugestaoAssistente() {
+    limparAlertaAssistente();
+    const habitoId = document.getElementById('assistant-habito').value;
+    const frequencia = parseInt(document.getElementById('assistant-frequencia').value, 10);
+    const periodo = document.getElementById('assistant-periodo').value;
+    const nivelRadio = document.querySelector('input[name="assistant-level"]:checked');
+    const nivel = nivelRadio ? nivelRadio.value : 'equilibrada';
+
+    if (!habitoId) {
+        mostrarAlertaAssistente('Selecione um hábito para receber a sugestão.');
+        return;
+    }
+    if (isNaN(frequencia) || frequencia < 1) {
+        mostrarAlertaAssistente('Informe uma frequência atual válida (número maior que zero).');
+        return;
+    }
+
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    const btnGerar = document.getElementById('btn-gerar-sugestao');
+    const originalText = btnGerar.innerHTML;
+    btnGerar.disabled = true;
+    btnGerar.innerHTML = '<span>Calculando sugestão...</span>';
+
+    fetch("{% url 'assistente_sugerir_meta' %}", {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': csrfToken
+        },
+        body: JSON.stringify({
+            habito_id: habitoId,
+            frequencia_atual: frequencia,
+            periodo: periodo,
+            nivel: nivel
+        })
+    })
+    .then(res => res.json().then(data => ({ status: res.status, body: data })))
+    .then(({ status, body }) => {
+        btnGerar.disabled = false;
+        btnGerar.innerHTML = originalText;
+
+        if (status !== 200 || !body.sucesso) {
+            mostrarAlertaAssistente(body.erro || 'Não foi possível gerar uma sugestão no momento.');
+            return;
+        }
+
+        sugestaoMetaAtual = body;
+        document.getElementById('suggestion-title').innerText = body.nome_habito;
+        document.getElementById('suggestion-highlight').innerText = body.quantidade_sugerida + ' vezes por ' + body.periodo;
+        document.getElementById('suggestion-text').innerText = body.mensagem;
+
+        document.getElementById('assistant-step-form').style.display = 'none';
+        document.getElementById('assistant-step-result').style.display = 'block';
+    })
+    .catch(err => {
+        btnGerar.disabled = false;
+        btnGerar.innerHTML = originalText;
+        mostrarAlertaAssistente('Erro de conexão ao consultar o assistente.');
+    });
+}
+
+function aplicarSugestaoNoFormulario() {
+    if (!sugestaoMetaAtual) return;
+
+    const selectHabito = document.getElementById('id_habito');
+    const inputQtd = document.getElementById('id_quantidade_minima');
+    const selectPeriodo = document.getElementById('id_periodo');
+
+    if (selectHabito) selectHabito.value = sugestaoMetaAtual.habito_id;
+    if (inputQtd) inputQtd.value = sugestaoMetaAtual.quantidade_sugerida;
+    if (selectPeriodo) selectPeriodo.value = sugestaoMetaAtual.periodo;
+
+    fecharAssistenteMetas();
+
+    const form = document.querySelector('.goal-form');
+    if (form) {
+        form.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        form.classList.add('goal-form-highlight');
+        setTimeout(() => { form.classList.remove('goal-form-highlight'); }, 2000);
+    }
+}
+
+function copiarLinkPublico(inputId, btn) {
+    const input = document.getElementById(inputId);
+    if (!input) return;
+    input.select();
+    input.setSelectionRange(0, 99999);
+    const span = btn.querySelector('span');
+    const originalText = span ? span.innerText : 'Copiar link';
+    
+    if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(input.value).then(() => {
+            if (span) span.innerText = 'Copiado!';
+            setTimeout(() => { if (span) span.innerText = originalText; }, 2000);
+        }).catch(() => {
+            document.execCommand('copy');
+            if (span) span.innerText = 'Copiado!';
+            setTimeout(() => { if (span) span.innerText = originalText; }, 2000);
+        });
+    } else {
+        document.execCommand('copy');
+        if (span) span.innerText = 'Copiado!';
+        setTimeout(() => { if (span) span.innerText = originalText; }, 2000);
+    }
+}
+
+function compartilharNativo(titulo, url) {
+    if (navigator.share) {
+        navigator.share({
+            title: 'Meta: ' + titulo,
+            text: 'Acompanhe a minha meta no Habbit-Control!',
+            url: url
+        }).catch(() => {});
+    } else {
+        navigator.clipboard.writeText(url).then(() => {
+            alert('Link copiado para a área de transferência!');
+        }).catch(() => {});
+    }
+}
+</script>
 {% endblock %}
-{% block extra_css %}<link rel="stylesheet" href="{% static 'pagina_interna/css/style.css' %}">{% endblock %}
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'pagina_interna/css/style.css' %}">
+<style>
+/* Cabeçalho com botão do assistente */
+.goal-form-header-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 8px;
+}
+.btn-assistant-open {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    background: linear-gradient(135deg, #004B5E 0%, #006B68 100%);
+    color: #FFFFFF;
+    font-size: 0.9rem;
+    font-weight: 600;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(0, 75, 94, 0.15);
+    transition: all 0.2s ease;
+}
+.btn-assistant-open:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 75, 94, 0.25);
+    background: linear-gradient(135deg, #003644 0%, #005250 100%);
+}
+
+/* Modal do assistente */
+.assistant-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 1050;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    box-sizing: border-box;
+}
+.assistant-modal-backdrop {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 30, 38, 0.6);
+    backdrop-filter: blur(3px);
+}
+.assistant-modal-card {
+    position: relative;
+    background: #FFFFFF;
+    border-radius: 16px;
+    max-width: 540px;
+    width: 100%;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 50px rgba(0, 75, 94, 0.25);
+    border: 1px solid #E1EBEF;
+    animation: modalFadeIn 0.25s ease-out;
+}
+@keyframes modalFadeIn {
+    from { opacity: 0; transform: translateY(12px) scale(0.98); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.assistant-modal-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    padding: 20px 24px;
+    border-bottom: 1px solid #EDF2F4;
+}
+.assistant-header-title-wrap {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+.assistant-avatar {
+    font-size: 2rem;
+    line-height: 1;
+}
+.assistant-modal-title {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #004B5E;
+}
+.assistant-modal-sub {
+    margin: 4px 0 0;
+    font-size: 0.88rem;
+    color: #637276;
+}
+.assistant-close-btn {
+    background: none;
+    border: none;
+    font-size: 1.6rem;
+    color: #7A898D;
+    cursor: pointer;
+    line-height: 1;
+    padding: 0 4px;
+}
+.assistant-close-btn:hover {
+    color: #17343B;
+}
+.assistant-alert {
+    margin: 16px 24px 0;
+    padding: 10px 14px;
+    background: #FDF2F2;
+    border: 1px solid #FCA5A5;
+    color: #DC2626;
+    border-radius: 8px;
+    font-size: 0.88rem;
+    font-weight: 500;
+}
+.assistant-body {
+    padding: 24px;
+}
+.assistant-field {
+    margin-bottom: 18px;
+}
+.assistant-label {
+    display: block;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #004B5E;
+    margin-bottom: 6px;
+}
+.assistant-select,
+.assistant-input {
+    width: 100%;
+    min-height: 42px;
+    padding: 8px 12px;
+    border: 1px solid #CBD5D8;
+    border-radius: 6px;
+    background: #FFFFFF;
+    color: #17343B;
+    font-size: 0.92rem;
+    box-sizing: border-box;
+}
+.assistant-grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+}
+.assistant-levels {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-top: 6px;
+}
+.assistant-level-card {
+    position: relative;
+    cursor: pointer;
+}
+.assistant-level-card input[type="radio"] {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+.level-content {
+    border: 1.5px solid #CBD5D8;
+    border-radius: 8px;
+    padding: 10px 8px;
+    text-align: center;
+    background: #FFFFFF;
+    transition: all 0.2s ease;
+    height: 100%;
+    box-sizing: border-box;
+}
+.assistant-level-card input[type="radio"]:checked + .level-content {
+    border-color: #006B68;
+    background: #E8F4F3;
+    box-shadow: 0 0 0 2px rgba(0, 107, 104, 0.2);
+}
+.level-badge {
+    display: block;
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-bottom: 4px;
+}
+.level-badge-confortavel { color: #166534; }
+.level-badge-equilibrada { color: #006B68; }
+.level-badge-desafiadora { color: #854D0E; }
+.level-desc {
+    display: block;
+    font-size: 0.72rem;
+    color: #637276;
+    line-height: 1.25;
+}
+.assistant-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 24px;
+    padding-top: 16px;
+    border-top: 1px solid #EDF2F4;
+}
+.btn-assistant-cancel {
+    padding: 9px 16px;
+    background: #FFFFFF;
+    border: 1px solid #CBD5D8;
+    color: #526367;
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 0.88rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+.btn-assistant-cancel:hover {
+    background: #F4F7F9;
+    color: #17343B;
+}
+.btn-assistant-submit,
+.btn-assistant-use {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 9px 20px;
+    background: #006B68;
+    border: 1px solid #006B68;
+    color: #FFFFFF;
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 0.88rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+.btn-assistant-submit:hover,
+.btn-assistant-use:hover {
+    background: #005250;
+    border-color: #005250;
+}
+
+/* Card de Sugestão */
+.assistant-suggestion-card {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    padding: 20px;
+    background: #F4F9F9;
+    border: 1.5px solid #C4E2E0;
+    border-radius: 12px;
+}
+.suggestion-icon {
+    font-size: 2.2rem;
+    line-height: 1;
+}
+.suggestion-details {
+    flex: 1;
+}
+.suggestion-subtitle {
+    display: block;
+    font-size: 0.82rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-weight: 700;
+    color: #006B68;
+    margin-bottom: 4px;
+}
+.suggestion-title {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #004B5E;
+}
+.suggestion-highlight {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: #006B68;
+    margin: 4px 0 10px;
+}
+.suggestion-text {
+    margin: 0;
+    font-size: 0.92rem;
+    color: #344B50;
+    line-height: 1.45;
+}
+
+/* Destaque temporário no formulário */
+.goal-form-highlight {
+    animation: formHighlightPulse 2s ease-out;
+}
+@keyframes formHighlightPulse {
+    0% { box-shadow: 0 0 0 4px rgba(0, 107, 104, 0.4); }
+    100% { box-shadow: none; }
+}
+
+/* Compartilhamento Público */
+.goal-public-sharing-card {
+    margin-top: 18px;
+    padding: 16px;
+    background: #F8FBFC;
+    border: 1px solid #E1EBEF;
+    border-radius: 8px;
+}
+.goal-public-header {
+    margin-bottom: 10px;
+}
+.goal-public-badge {
+    display: inline-block;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #006B68;
+    background: #E1F2F0;
+    padding: 3px 8px;
+    border-radius: 4px;
+}
+.goal-public-url-box {
+    margin-bottom: 12px;
+}
+.goal-public-input {
+    width: 100%;
+    padding: 8px 12px;
+    font-size: 0.88rem;
+    color: #004B5E;
+    background: #FFFFFF;
+    border: 1px solid #CBD5D8;
+    border-radius: 6px;
+    box-sizing: border-box;
+}
+.goal-public-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
+.btn-share-enable,
+.btn-share-copy,
+.btn-share-whatsapp,
+.btn-share-native,
+.btn-share-disable {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 12px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    border-radius: 6px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    text-decoration: none;
+    transition: all 0.2s ease;
+}
+.btn-share-enable {
+    background: #006B68;
+    color: #FFFFFF;
+    border-color: #006B68;
+}
+.btn-share-enable:hover {
+    background: #005250;
+    border-color: #005250;
+}
+.btn-share-copy {
+    background: #FFFFFF;
+    color: #004B5E;
+    border-color: #CBD5D8;
+}
+.btn-share-copy:hover {
+    background: #E8EEF0;
+}
+.btn-share-whatsapp {
+    background: #25D366;
+    color: #FFFFFF;
+}
+.btn-share-whatsapp:hover {
+    background: #1EBE5D;
+}
+.btn-share-native {
+    background: #004B5E;
+    color: #FFFFFF;
+}
+.btn-share-native:hover {
+    background: #003644;
+}
+.btn-share-disable {
+    background: #FFFFFF;
+    color: #637276;
+    border-color: #CBD5D8;
+    font-weight: 500;
+}
+.btn-share-disable:hover {
+    background: #FDF2F2;
+    color: #DC2626;
+    border-color: #FCA5A5;
+}
+.goal-actions-footer {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 14px;
+}
+
+@media (max-width: 640px) {
+    .assistant-grid-2 {
+        grid-template-columns: 1fr;
+    }
+    .assistant-levels {
+        grid-template-columns: 1fr;
+    }
+}
+</style>
+{% endblock %}
