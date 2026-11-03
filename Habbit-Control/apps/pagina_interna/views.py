@@ -115,6 +115,69 @@ def cadastro_habito(request):
 	# Renderiza a página normalmente para GET
 	return render(request, 'pagina_interna/cadastro_habito.html', {'cliente': cliente})
 
+def dashboard(request):
+	# Verifica se o usuário está autenticado
+	cliente, _ = get_cliente_from_session(request)
+
+	if not cliente:
+		messages.warning(request, 'Por favor, faça login para acessar esta página.')
+		return redirect('login')
+
+	from apps.pagina_interna.models import Habito, RegistroAtividade
+	from apps.pagina_interna.progresso import obter_dados_relatorio
+	from datetime import date
+
+	habitos = Habito.objects.filter(cliente=cliente).order_by('-data_criacao')
+	total_habitos = habitos.count()
+	habitos_positivos = habitos.filter(tipo_habito='positivo').count()
+	habitos_negativos = habitos.filter(tipo_habito='negativo').count()
+
+	# Atividade de hoje (mesma lógica de atividade_diaria para a data atual)
+	hoje = date.today()
+	atividade_hoje = []
+	for habito in habitos:
+		registro = RegistroAtividade.objects.filter(habito=habito, data=hoje).first()
+		atividade_hoje.append({
+			'habito': habito,
+			'quantidade': registro.quantidade if registro else 0
+		})
+
+	# Progresso atual — reutiliza a regra de api_dados_relatorio (período padrão: semana)
+	habito_selecionado = None
+	progresso_atual = None
+	habito_id = request.GET.get('habito_id')
+	periodo_progresso = request.GET.get('periodo', 'semana')
+	if periodo_progresso not in ('dia', 'semana', 'mes', 'ano'):
+		periodo_progresso = 'semana'
+
+	if habitos.exists():
+		if habito_id:
+			habito_selecionado = habitos.filter(id=habito_id).first()
+		if not habito_selecionado:
+			habito_selecionado = habitos.first()
+		progresso_atual = obter_dados_relatorio(habito_selecionado, periodo_progresso)
+
+	# Atividade recente — registros do próprio usuário, ordenados por data
+	atividades_recentes = RegistroAtividade.objects.filter(
+		habito__cliente=cliente
+	).select_related('habito').order_by('-data', '-data_criacao')[:8]
+
+	context = {
+		'cliente': cliente,
+		'habitos': habitos,
+		'total_habitos': total_habitos,
+		'habitos_positivos': habitos_positivos,
+		'habitos_negativos': habitos_negativos,
+		'atividade_hoje': atividade_hoje,
+		'habito_selecionado': habito_selecionado,
+		'progresso_atual': progresso_atual,
+		'periodo_progresso': periodo_progresso,
+		'atividades_recentes': atividades_recentes,
+	}
+
+	return render(request, 'pagina_interna/dashboard.html', context)
+
+
 def progressos(request):
 	# Verifica se o usuário está autenticado
 	cliente, _ = get_cliente_from_session(request)
@@ -209,162 +272,51 @@ def relatorios(request):
 
 
 def api_dados_relatorio(request):
-	#API endpoint para buscar dados do gráfico de relatórios
+	# API endpoint para buscar dados do gráfico de relatórios
 	from django.http import JsonResponse
-	from apps.pagina_interna.models import Habito, RegistroAtividade
-	from datetime import date, timedelta
-	from django.db.models import Sum
-	
+	from apps.pagina_interna.models import Habito
+	from apps.pagina_interna.progresso import obter_dados_relatorio
+
 	# Verifica se o usuário está autenticado
 	cliente, _ = get_cliente_from_session(request)
-	
+
 	if not cliente:
 		return JsonResponse({'success': False, 'error': 'Usuário não autenticado'}, status=401)
-	
+
 	if request.method == 'GET':
 		try:
 			habito_id = request.GET.get('habito_id')
 			periodo = request.GET.get('periodo', 'mes')  # dia, semana, mes, ano
-			
+
 			if not habito_id:
 				return JsonResponse({'success': False, 'error': 'Hábito não especificado'}, status=400)
-			
+
 			# Busca o hábito e verifica se pertence ao cliente
 			try:
 				habito = Habito.objects.get(id=habito_id, cliente=cliente)
 			except Habito.DoesNotExist:
 				return JsonResponse({'success': False, 'error': 'Hábito não encontrado'}, status=404)
-			
-			# Define o período de tempo
-			data_fim = date.today()
-			if periodo == 'dia':
-				data_inicio = data_fim
-				intervalo = timedelta(days=1)
-			elif periodo == 'semana':
-				data_inicio = data_fim - timedelta(days=6)
-				intervalo = timedelta(days=1)
-			elif periodo == 'mes':
-				data_inicio = data_fim - timedelta(days=29)
-				intervalo = timedelta(days=1)
-			elif periodo == 'ano':
-				data_inicio = data_fim - timedelta(days=364)
-				intervalo = timedelta(days=7)  # Agrupa por semana no ano
-			else:
+
+			if periodo not in ('dia', 'semana', 'mes', 'ano'):
 				return JsonResponse({'success': False, 'error': 'Período inválido'}, status=400)
-			
-			# Busca registros do período
-			registros = RegistroAtividade.objects.filter(
-				habito=habito,
-				data__gte=data_inicio,
-				data__lte=data_fim
-			).order_by('data')
-			
-			# Calcula a frequência desejada normalizada para o período
-			freq_desejada_valor = habito.frequencia_desejada_valor
-			freq_desejada_periodo = habito.frequencia_desejada_periodo
-			
-			# Converte frequência desejada para "por dia"
-			freq_desejada_por_dia = freq_desejada_valor
-			if freq_desejada_periodo == 'semana':
-				freq_desejada_por_dia = freq_desejada_valor / 7
-			elif freq_desejada_periodo == 'mes':
-				freq_desejada_por_dia = freq_desejada_valor / 30
-			elif freq_desejada_periodo == 'ano':
-				freq_desejada_por_dia = freq_desejada_valor / 365
-			
-			# Prepara dados para o gráfico
-			labels = []
-			dados_registrados_acumulados = []
-			dados_esperados_acumulados = []
-			progresso_percent = []
-			
-			current_date = data_inicio
-			total_registrado_acumulado = 0
-			dias_contados = 0
-			
-			while current_date <= data_fim:
-				# Busca registros deste dia/período
-				if periodo == 'ano':
-					# Para ano, agrupa por semana
-					semana_fim = min(current_date + timedelta(days=6), data_fim)
-					registros_periodo = registros.filter(
-						data__gte=current_date,
-						data__lte=semana_fim
-					)
-					quantidade_periodo = sum(r.quantidade for r in registros_periodo)
-					label = f"{current_date.strftime('%d/%m')} - {semana_fim.strftime('%d/%m')}"
-					dias_no_periodo = (semana_fim - current_date).days + 1
-					dias_contados += dias_no_periodo
-					current_date = semana_fim + timedelta(days=1)
-				else:
-					# Para dia, semana, mês - mostra por dia
-					registro_dia = registros.filter(data=current_date).first()
-					quantidade_periodo = registro_dia.quantidade if registro_dia else 0
-					label = current_date.strftime('%d/%m')
-					dias_no_periodo = 1
-					dias_contados += 1
-					current_date += timedelta(days=1)
-				
-				# Soma acumulada dos registros
-				total_registrado_acumulado += quantidade_periodo
-				
-				# Calcula o esperado acumulado até este ponto
-				esperado_acumulado = freq_desejada_por_dia * dias_contados
-				
-				# Calcula progresso baseado no acumulado
-				if habito.tipo_habito == 'positivo':
-					# Para hábitos positivos: quanto mais, melhor
-					if esperado_acumulado > 0:
-						progresso = min(100, (total_registrado_acumulado / esperado_acumulado) * 100)
-					else:
-						progresso = 0
-				else:
-					# Para hábitos negativos: quanto menos, melhor
-					if esperado_acumulado > 0:
-						progresso = min(100, max(0, (1 - (total_registrado_acumulado / esperado_acumulado)) * 100))
-					else:
-						progresso = 100 if total_registrado_acumulado == 0 else 0
-				
-				labels.append(label)
-				dados_registrados_acumulados.append(total_registrado_acumulado)
-				dados_esperados_acumulados.append(round(esperado_acumulado, 1))
-				progresso_percent.append(round(progresso, 2))
-			
-			# Calcula total registrado no período
-			total_registrado_periodo = sum(r.quantidade for r in registros)
-			
-			# Calcula total esperado no período
-			dias_total = (data_fim - data_inicio).days + 1
-			if periodo == 'dia':
-				total_esperado = freq_desejada_por_dia
-			elif periodo == 'semana':
-				total_esperado = freq_desejada_por_dia * dias_total
-			elif periodo == 'mes':
-				total_esperado = freq_desejada_por_dia * dias_total
-			else:  # ano
-				total_esperado = freq_desejada_por_dia * 365
-			
+
+			dados = obter_dados_relatorio(habito, periodo)
+
 			return JsonResponse({
 				'success': True,
-				'habito': {
-					'id': habito.id,
-					'nome': habito.nome_habito,
-					'tipo': habito.tipo_habito,
-					'frequencia_desejada_valor': habito.frequencia_desejada_valor,
-					'frequencia_desejada_periodo': habito.get_frequencia_desejada_periodo_display()
-				},
-				'periodo': periodo,
-				'total_registrado': total_registrado_periodo,
-				'total_esperado': round(total_esperado, 1),
-				'labels': labels,
-				'dados_registrados': dados_registrados_acumulados,
-				'dados_esperados': dados_esperados_acumulados,
-				'progresso_percent': progresso_percent
+				'habito': dados['habito'],
+				'periodo': dados['periodo'],
+				'total_registrado': dados['total_registrado'],
+				'total_esperado': dados['total_esperado'],
+				'labels': dados['labels'],
+				'dados_registrados': dados['dados_registrados'],
+				'dados_esperados': dados['dados_esperados'],
+				'progresso_percent': dados['progresso_percent']
 			})
-			
+
 		except Exception as e:
 			return JsonResponse({'success': False, 'error': str(e)}, status=400)
-	
+
 	return JsonResponse({'success': False, 'error': 'Método não permitido'}, status=405)
 
 def editar_habito(request, habito_id):
@@ -521,6 +473,9 @@ def revenda_adm(request):
 @require_POST
 def update_cliente(request):
     try:
+        from django.core.validators import validate_email
+        from django.db import IntegrityError
+
         data = json.loads(request.body)
         field = data.get('field')
         value = data.get('value')
@@ -535,7 +490,7 @@ def update_cliente(request):
         if not cliente:
             return JsonResponse({'success': False, 'error': 'Usuário não autenticado. Faça login novamente.'}, status=401)
         
-        # 2. LISTA DE CAMPOS PERMITIDOS 
+        # 2. LISTA DE CAMPOS PERMITIDOS (profissao não está e não deve estar)
         field_map = {
             'nome_completo': 'nome_completo',
             'idade': 'idade',
@@ -543,7 +498,6 @@ def update_cliente(request):
             'password': 'password', # O JS manda 'password', o model tem 'password'
             'cidade': 'cidade',
             'estado': 'estado',
-            'profissao': 'profissao'
         }
 
         # Verifica se o campo enviado é permitido
@@ -552,8 +506,9 @@ def update_cliente(request):
             return JsonResponse({'success': False, 'error': f'Campo {field} não permitido'}, status=400)
         
         model_field = field_map[field]
+        response_value = None
 
-        # 3. Lógica Especial para Senha
+        # 3. Validações e atualização por campo
         if model_field == 'password':
             if not value or not str(value).strip():
                 return JsonResponse({'success': False, 'error': 'A senha não pode ser vazia'}, status=400)
@@ -567,14 +522,62 @@ def update_cliente(request):
                     'errors': list(e.messages)
                 }, status=400)
             cliente.password = raw_password
-        else:
-            setattr(cliente, model_field, value)
+            response_value = None  # nunca devolver senha
+        elif model_field == 'nome_completo':
+            nome = str(value).strip()
+            if not nome:
+                return JsonResponse({'success': False, 'error': 'O nome completo não pode ficar vazio'}, status=400)
+            if len(nome) > 255:
+                return JsonResponse({'success': False, 'error': 'O nome completo é muito longo'}, status=400)
+            cliente.nome_completo = nome
+            response_value = nome
+        elif model_field == 'idade':
+            try:
+                idade = int(value)
+            except (TypeError, ValueError):
+                return JsonResponse({'success': False, 'error': 'A idade deve ser um número inteiro válido'}, status=400)
+            if idade < 0:
+                return JsonResponse({'success': False, 'error': 'A idade não pode ser negativa'}, status=400)
+            cliente.idade = idade
+            response_value = idade
+        elif model_field == 'email':
+            email = str(value).lower().strip()
+            try:
+                validate_email(email)
+            except ValidationError:
+                return JsonResponse({'success': False, 'error': 'Informe um e-mail válido'}, status=400)
+            if Cliente.objects.filter(email=email).exclude(pk=cliente.pk).exists():
+                return JsonResponse({'success': False, 'error': 'Este email já está cadastrado'}, status=400)
+            cliente.email = email
+            response_value = email
+        elif model_field == 'estado':
+            estado = str(value).strip().upper()
+            if estado and len(estado) > 2:
+                return JsonResponse({'success': False, 'error': 'Estado inválido'}, status=400)
+            cliente.estado = estado or None
+            response_value = cliente.estado or ''
+        elif model_field == 'cidade':
+            cidade = str(value).strip()
+            if len(cidade) > 100:
+                return JsonResponse({'success': False, 'error': 'A cidade é muito longa'}, status=400)
+            cliente.cidade = cidade or None
+            response_value = cliente.cidade or ''
 
         # 4. Salvar
-        cliente.save()
+        try:
+            cliente.save()
+        except IntegrityError:
+            return JsonResponse({'success': False, 'error': 'Este email já está cadastrado'}, status=400)
+
+        # Mantém a sessão alinhada se o e-mail foi alterado
+        if model_field == 'email':
+            request.session['cliente_email'] = cliente.email
         
         print(f"[SUCESSO] Cliente {cliente.id} atualizou {model_field}.")
-        return JsonResponse({'success': True, 'message': 'Dados atualizados com sucesso'})
+        payload = {'success': True, 'message': 'Dados atualizados com sucesso'}
+        if response_value is not None:
+            payload['value'] = response_value
+        return JsonResponse(payload)
     
     except json.JSONDecodeError:
         return JsonResponse({'success': False, 'error': 'JSON inválido'}, status=400)

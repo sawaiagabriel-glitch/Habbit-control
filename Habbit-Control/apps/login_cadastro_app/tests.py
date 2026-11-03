@@ -254,7 +254,7 @@ class LoginViewTest(TestCase):
             'email': 'ana@example.com',
             'password': 'senhaCerta123'
         })
-        self.assertRedirects(response, reverse('alterar_dados'))
+        self.assertRedirects(response, reverse('dashboard'))
         self.assertEqual(self.client.session.get('cliente_email'), 'ana@example.com')
 
     def test_login_insensivel_a_maiusculas_email(self):
@@ -262,7 +262,7 @@ class LoginViewTest(TestCase):
             'email': 'ANA@EXAMPLE.COM',
             'password': 'senhaCerta123'
         })
-        self.assertRedirects(response, reverse('alterar_dados'))
+        self.assertRedirects(response, reverse('dashboard'))
         self.assertEqual(self.client.session.get('cliente_email'), 'ana@example.com')
 
     def test_login_senha_incorreta(self):

@@ -105,11 +105,11 @@ Cliente autenticado.
 **Regras de negócio:**
 1. A rota `/alterar_dados/` deve responder a requisições GET com status HTTP 200 para clientes autenticados.
 2. A tela deve apresentar os dados agrupados em três seções estruturadas:
-   - **Dados Pessoais:** `nome_completo`, `idade`, `profissao`;
+   - **Dados Pessoais:** `nome_completo`, `idade`;
    - **Localização:** `cidade`, `estado`;
    - **Conta e Segurança:** `email`, `password` (exibida estritamente mascarada como `********`).
 3. A senha armazenada no banco de dados nunca deve ser transmitida para o template em texto plano nem em formato hash. O valor renderizado para o campo senha deve ser estaticamente `"********"`.
-4. Os campos `nome_completo`, `idade`, `profissao`, `cidade`, `estado`, `email` e `senha` devem conter o elemento de gatilho de edição (`.edit-icon`).
+4. Os campos `nome_completo`, `idade`, `cidade`, `estado`, `email` e `senha` devem conter o elemento de gatilho de edição (`.edit-icon`).
 5. No template `alterar_dados_cliente.html`, os campos `Cidade` e `Estado` contêm a classe CSS `editable` e possuem o elemento visual `<svg class="edit-icon">`, permitindo sua edição na interface da mesma forma que os demais campos permitidos.
 
 **Fluxo principal:**
@@ -135,7 +135,7 @@ Cliente autenticado.
   AND o valor visual exibido para a senha deve ser estritamente `"********"`.
 
 **Casos-limite:**
-- Campos opcionais nulos ou em branco no banco (ex.: profissão nula): renderizados como vazio sem interrupção do carregamento da página.
+- Campos opcionais nulos ou em branco no banco (ex.: cidade nula): renderizados como vazio sem interrupção do carregamento da página.
 
 **Fora de escopo:**
 - Upload de foto de perfil ou avatar.
@@ -166,7 +166,6 @@ Cliente autenticado.
 |---|---|---|
 | Nome Completo | `type="text"` | Recebe o texto atual em exibição. |
 | Idade | `type="number"` | Recebe o número atual em exibição. |
-| Profissão | `type="text"` | Recebe o texto atual em exibição. |
 | Email | `type="email"` | Recebe o e-mail atual em exibição. |
 | Senha | `type="password"` | Inicia com valor vazio `""` e placeholder `"Digite a nova senha"`. Acompanhado de botão com ícone de olho para alternância de visibilidade. |
 
@@ -225,7 +224,7 @@ Cliente autenticado.
 ### REQ-PERFIL-04 — Atualização de Dados via API Assíncrona
 
 **Descrição EARS:**  
-WHEN the frontend submits an asynchronous HTTP POST request to `/api/cliente/update/` containing a valid CSRF token, authenticated session, and JSON payload with `field` and `value`, IF the specified `field` belongs to the allowed whitelist (`nome_completo`, `idade`, `email`, `password`, `cidade`, `estado`, `profissao`), THEN THE SYSTEM SHALL assign the value to the `Cliente` model, execute `cliente.save()`, and respond with HTTP 200 JSON `{"success": true, "message": "Dados atualizados com sucesso"}`.
+WHEN the frontend submits an asynchronous HTTP POST request to `/api/cliente/update/` containing a valid CSRF token, authenticated session, and JSON payload with `field` and `value`, IF the specified `field` belongs to the allowed whitelist (`nome_completo`, `idade`, `email`, `password`, `cidade`, `estado`), THEN THE SYSTEM SHALL assign the value to the `Cliente` model, execute `cliente.save()`, and respond with HTTP 200 JSON `{"success": true, "message": "Dados atualizados com sucesso"}`.
 
 **Objetivo:**  
 Processar a gravação no banco de dados de alterações cadastrais unitárias enviadas pela interface de perfil de forma assíncrona.
@@ -240,7 +239,7 @@ Cliente autenticado.
 **Entradas:**
 | Campo | Tipo | Obrigatório | Restrições |
 |---|---|---|---|
-| `field` | String | Sim | Deve pertencer à lista branca: `'nome_completo'`, `'idade'`, `'email'`, `'password'`, `'cidade'`, `'estado'`, `'profissao'`. |
+| `field` | String | Sim | Deve pertencer à lista branca: `'nome_completo'`, `'idade'`, `'email'`, `'password'`, `'cidade'`, `'estado'`. |
 | `value` | Qualquer (string/número) | Sim | Não pode ser nulo (`None`). Pode ser string vazia para campos que permitem vazio, exceto senha. |
 
 **Regras de negócio:**
@@ -255,7 +254,6 @@ Cliente autenticado.
    - `'password'` -> `'password'`
    - `'cidade'` -> `'cidade'`
    - `'estado'` -> `'estado'`
-   - `'profissao'` -> `'profissao'`
 6. Caso o campo não conste no `field_map`, a requisição é rejeitada conforme REQ-PERFIL-06.
 7. Caso o campo seja diferente de `'password'`, o sistema executa `setattr(cliente, model_field, value)`.
 8. O método `cliente.save()` deve ser invocado, garantindo que o método `save()` do modelo execute a normalização de e-mail e o hash de senha necessários.
@@ -267,6 +265,7 @@ Cliente autenticado.
 11. NOTA TÉCNICA / DECISÃO RESOLVIDA:
     - O campo `'pais'` foi removido do `field_map` da view e do JS, pois não existe coluna `pais` no modelo `Cliente`.
     - O campo `'estado'` foi adicionado ao `field_map`, permitindo sua atualização pela API e edição no perfil.
+    - O campo `'profissao'` foi removido do modelo `Cliente`, do `field_map`, dos templates e do JS; não faz parte do Habbit-Control.
 
 **Fluxo principal:**
 1. O frontend envia requisição POST para `/api/cliente/update/` com headers `Content-Type: application/json` e `X-CSRFToken: <token>` e payload `{"field": "nome_completo", "value": "Gabriel Silva"}`.
@@ -290,10 +289,10 @@ Cliente autenticado.
 
 **Critérios de aceitação:**
 - GIVEN um cliente autenticado na sessão
-  WHEN enviar POST para `/api/cliente/update/` com payload `{"field": "profissao", "value": "Engenheiro de Software"}`
+  WHEN enviar POST para `/api/cliente/update/` com payload `{"field": "cidade", "value": "Campinas"}`
   THEN o código HTTP de retorno deve ser 200
   AND o corpo JSON deve conter `{"success": true, "message": "Dados atualizados com sucesso"}`
-  AND a consulta ao banco deve confirmar que `cliente.profissao` é igual a `"Engenheiro de Software"`.
+  AND a consulta ao banco deve confirmar que `cliente.cidade` é igual a `"Campinas"`.
 - GIVEN uma requisição sem sessão de autenticação ativa
   WHEN enviar POST para `/api/cliente/update/`
   THEN o status retornado deve ser HTTP 401
@@ -406,12 +405,12 @@ Cliente autenticado ou agente externo.
 **Entradas:**
 | Campo | Tipo | Valor |
 |---|---|---|
-| `field` | String | Qualquer identificador não contido em `['nome_completo', 'idade', 'email', 'password', 'cidade', 'estado', 'profissao']` (ex.: `'id'`, `'data_criacao'`, `'lgpd'`, `'is_superuser'`, `'pais'`). |
+| `field` | String | Qualquer identificador não contido em `['nome_completo', 'idade', 'email', 'password', 'cidade', 'estado']` (ex.: `'id'`, `'data_criacao'`, `'lgpd'`, `'is_superuser'`, `'pais'`, `'profissao'`). |
 | `value` | Qualquer | Qualquer valor enviado. |
 
 **Regras de negócio:**
 1. Apenas os campos explicitamente mapeados no dicionário `field_map` da view `update_cliente` são permitidos:
-   - `nome_completo`, `idade`, `email`, `password`, `cidade`, `estado`, `profissao`.
+   - `nome_completo`, `idade`, `email`, `password`, `cidade`, `estado`.
 2. Se o valor recebido na chave `field` não for uma chave do `field_map`:
    - A operação de gravação deve ser bloqueada;
    - O sistema deve retornar status HTTP 400;

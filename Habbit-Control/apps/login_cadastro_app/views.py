@@ -91,8 +91,8 @@ def login(request):
                 request.session['cliente_email'] = cliente.email
                 messages.success(request, f'Bem-vindo(a), {cliente.nome_completo.split()[0]}!')
                 
-                # Redireciona para a página interna 
-                return redirect('alterar_dados')
+				# Redireciona para a Dashboard após login
+                return redirect('dashboard')
             else:
                 # Limpa mensagens antigas antes de renderizar
                 storage = messages.get_messages(request)

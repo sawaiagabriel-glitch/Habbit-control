@@ -1,10 +1,12 @@
 import json
 import importlib
 import os
+from datetime import date
 from unittest import mock
 from django.test import TestCase, Client, SimpleTestCase
 from django.urls import reverse
 from apps.login_cadastro_app.models import Cliente
+from apps.pagina_interna.models import Habito, RegistroAtividade
 
 
 class PerfilClienteViewTest(TestCase):
@@ -19,7 +21,6 @@ class PerfilClienteViewTest(TestCase):
             password="senhaSegura123",
             cidade="Curitiba",
             estado="PR",
-            profissao="Designer",
             lgpd=True
         )
 
@@ -86,7 +87,7 @@ class PerfilClienteViewTest(TestCase):
 
     def test_campos_nao_autorizados_bloqueados(self):
         self._autenticar()
-        campos_bloqueados = ['id', 'data_criacao', 'lgpd', 'is_superuser', 'campo_inexistente']
+        campos_bloqueados = ['id', 'data_criacao', 'lgpd', 'is_superuser', 'campo_inexistente', 'profissao']
         for campo in campos_bloqueados:
             with self.subTest(campo=campo):
                 payload = {'field': campo, 'value': 'valor_qualquer'}
@@ -99,6 +100,103 @@ class PerfilClienteViewTest(TestCase):
                 data = response.json()
                 self.assertFalse(data.get('success'))
                 self.assertEqual(data.get('error'), f'Campo {campo} não permitido')
+
+    def test_editar_nome_sucesso(self):
+        self._autenticar()
+        payload = {'field': 'nome_completo', 'value': 'Maria Silva Santos'}
+        response = self.client.post(
+            self.update_url,
+            data=json.dumps(payload),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertTrue(data.get('success'))
+        self.cliente.refresh_from_db()
+        self.assertEqual(self.cliente.nome_completo, 'Maria Silva Santos')
+
+    def test_editar_idade_sucesso(self):
+        self._autenticar()
+        payload = {'field': 'idade', 'value': 31}
+        response = self.client.post(
+            self.update_url,
+            data=json.dumps(payload),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertTrue(data.get('success'))
+        self.cliente.refresh_from_db()
+        self.assertEqual(self.cliente.idade, 31)
+
+    def test_editar_email_valido_sucesso(self):
+        self._autenticar()
+        payload = {'field': 'email', 'value': '  NOVO.EMAIL@Example.COM '}
+        response = self.client.post(
+            self.update_url,
+            data=json.dumps(payload),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertTrue(data.get('success'))
+        self.cliente.refresh_from_db()
+        self.assertEqual(self.cliente.email, 'novo.email@example.com')
+        self.assertEqual(self.client.session.get('cliente_email'), 'novo.email@example.com')
+
+    def test_email_duplicado_e_rejeitado(self):
+        Cliente.objects.create(
+            nome_completo='Outro Usuario',
+            idade=40,
+            email='jaexiste@example.com',
+            password='senhaOutra123',
+            lgpd=True
+        )
+        self._autenticar()
+        payload = {'field': 'email', 'value': 'jaexiste@example.com'}
+        response = self.client.post(
+            self.update_url,
+            data=json.dumps(payload),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 400)
+        data = response.json()
+        self.assertFalse(data.get('success'))
+        self.assertIn('já está cadastrado', data.get('error', ''))
+        self.cliente.refresh_from_db()
+        self.assertEqual(self.cliente.email, 'maria.silva@example.com')
+
+    def test_profissao_inexistente_e_nao_pode_ser_alterada(self):
+        self._autenticar()
+        self.assertFalse(
+            any(f.name == 'profissao' for f in Cliente._meta.get_fields())
+        )
+        payload = {'field': 'profissao', 'value': 'Designer'}
+        response = self.client.post(
+            self.update_url,
+            data=json.dumps(payload),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 400)
+        data = response.json()
+        self.assertFalse(data.get('success'))
+        self.assertEqual(data.get('error'), 'Campo profissao não permitido')
+
+    def test_pagina_alterar_dados_tem_controles_de_edicao(self):
+        self._autenticar()
+        response = self.client.get(self.alterar_dados_url)
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode('utf-8')
+        self.assertIn('data-field="nome_completo"', content)
+        self.assertIn('data-field="idade"', content)
+        self.assertIn('data-field="cidade"', content)
+        self.assertIn('data-field="estado"', content)
+        self.assertIn('data-field="email"', content)
+        self.assertIn('data-field="password"', content)
+        self.assertIn('edit_profile.js', content)
+        self.assertIn('********', content)
+        self.assertNotIn('profissao', content.lower())
+        self.assertNotIn('Profissão', content)
 
     def test_update_cliente_nao_autenticado_retorna_401(self):
         payload = {'field': 'cidade', 'value': 'Campinas'}
@@ -195,13 +293,141 @@ class PerfilClienteViewTest(TestCase):
         self.assertEqual(resp_antiga.status_code, 200)
         self.assertNotIn('cliente_email', novo_client.session)
 
-        # Login com a nova senha deve ter sucesso e redirecionar
+        # Login com a nova senha deve ter sucesso e redirecionar para a Dashboard
         resp_nova = novo_client.post(login_url, {
             'email': self.cliente.email,
             'password': nova_senha
         })
-        self.assertRedirects(resp_nova, reverse('alterar_dados'))
+        self.assertRedirects(resp_nova, reverse('dashboard'))
         self.assertEqual(novo_client.session.get('cliente_email'), self.cliente.email)
+
+
+class DashboardViewTest(TestCase):
+    def setUp(self):
+        self.client = Client()
+        self.dashboard_url = reverse('dashboard')
+        self.login_url = reverse('login')
+
+        self.cliente = Cliente.objects.create(
+            nome_completo="Usuario Dashboard",
+            idade=30,
+            email="dashboard@example.com",
+            password="senhaDashboard123",
+            lgpd=True
+        )
+        self.outro_cliente = Cliente.objects.create(
+            nome_completo="Outro Usuario",
+            idade=35,
+            email="outro@example.com",
+            password="senhaOutro123",
+            lgpd=True
+        )
+
+        self.habito_positivo = Habito.objects.create(
+            cliente=self.cliente,
+            tipo_habito='positivo',
+            nome_habito='Academia',
+            frequencia_atual_valor=2,
+            frequencia_atual_periodo='semana',
+            frequencia_desejada_valor=4,
+            frequencia_desejada_periodo='semana'
+        )
+        self.habito_negativo = Habito.objects.create(
+            cliente=self.cliente,
+            tipo_habito='negativo',
+            nome_habito='Fumar',
+            frequencia_atual_valor=5,
+            frequencia_atual_periodo='dia',
+            frequencia_desejada_valor=0,
+            frequencia_desejada_periodo='dia'
+        )
+        self.habito_outro = Habito.objects.create(
+            cliente=self.outro_cliente,
+            tipo_habito='positivo',
+            nome_habito='Hábito Secreto',
+            frequencia_atual_valor=1,
+            frequencia_atual_periodo='dia',
+            frequencia_desejada_valor=3,
+            frequencia_desejada_periodo='dia'
+        )
+
+        RegistroAtividade.objects.create(
+            habito=self.habito_positivo,
+            data=date.today(),
+            quantidade=3
+        )
+        RegistroAtividade.objects.create(
+            habito=self.habito_outro,
+            data=date.today(),
+            quantidade=9
+        )
+
+    def _autenticar(self, cliente=None):
+        if cliente is None:
+            cliente = self.cliente
+        session = self.client.session
+        session['cliente_email'] = cliente.email
+        session.save()
+
+    def test_nao_autenticado_nao_acessa_dashboard(self):
+        response = self.client.get(self.dashboard_url)
+        self.assertEqual(response.status_code, 302)
+        self.assertRedirects(response, reverse('login'))
+
+    def test_autenticado_acessa_dashboard(self):
+        self._autenticar()
+        response = self.client.get(self.dashboard_url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Dashboard')
+        self.assertTemplateUsed(response, 'pagina_interna/dashboard.html')
+
+    def test_dashboard_mostra_somente_habitos_do_usuario(self):
+        self._autenticar()
+        response = self.client.get(self.dashboard_url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Academia')
+        self.assertContains(response, 'Fumar')
+        self.assertNotContains(response, 'Hábito Secreto')
+        habitos = list(response.context['habitos'])
+        self.assertEqual(len(habitos), 2)
+        self.assertTrue(all(h.cliente_id == self.cliente.id for h in habitos))
+
+    def test_contagem_total_habitos_correta(self):
+        self._autenticar()
+        response = self.client.get(self.dashboard_url)
+        self.assertEqual(response.context['total_habitos'], 2)
+
+    def test_contagem_positivos_e_negativos_correta(self):
+        self._autenticar()
+        response = self.client.get(self.dashboard_url)
+        self.assertEqual(response.context['habitos_positivos'], 1)
+        self.assertEqual(response.context['habitos_negativos'], 1)
+
+    def test_registros_de_outro_usuario_nao_aparecem(self):
+        self._autenticar()
+        response = self.client.get(self.dashboard_url)
+        self.assertEqual(response.status_code, 200)
+
+        # Atividade de hoje só do próprio usuário
+        nomes_hoje = [item['habito'].nome_habito for item in response.context['atividade_hoje']]
+        self.assertIn('Academia', nomes_hoje)
+        self.assertIn('Fumar', nomes_hoje)
+        self.assertNotIn('Hábito Secreto', nomes_hoje)
+
+        # Atividade recente só do próprio usuário
+        for registro in response.context['atividades_recentes']:
+            self.assertEqual(registro.habito.cliente_id, self.cliente.id)
+            self.assertNotEqual(registro.habito.nome_habito, 'Hábito Secreto')
+
+        self.assertNotContains(response, 'Hábito Secreto')
+
+    def test_login_redireciona_para_dashboard(self):
+        response = self.client.post(self.login_url, {
+            'email': 'dashboard@example.com',
+            'password': 'senhaDashboard123'
+        })
+        self.assertRedirects(response, reverse('dashboard'))
+        self.assertEqual(self.client.session.get('cliente_email'), 'dashboard@example.com')
 
 
 class ConfiguracoesSegurancaTest(SimpleTestCase):
