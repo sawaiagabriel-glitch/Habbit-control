@@ -123,8 +123,9 @@ def dashboard(request):
 		messages.warning(request, 'Por favor, faça login para acessar esta página.')
 		return redirect('login')
 
-	from apps.pagina_interna.models import Habito, RegistroAtividade
+	from apps.pagina_interna.models import Habito, Meta, RegistroAtividade
 	from apps.pagina_interna.progresso import obter_dados_relatorio
+	from apps.pagina_interna.services import obter_resumo_meta
 	from datetime import date
 
 	habitos = Habito.objects.filter(cliente=cliente).order_by('-data_criacao')
@@ -162,6 +163,14 @@ def dashboard(request):
 		habito__cliente=cliente
 	).select_related('habito').order_by('-data', '-data_criacao')[:8]
 
+	# Metas — somente leitura via helper público (sem OpenAI / sem criar ciclos)
+	metas_cliente = (
+		Meta.objects.filter(habito__cliente=cliente)
+		.select_related('habito', 'plano_assistente')
+		.order_by('-data_criacao')
+	)
+	metas_resumo = [obter_resumo_meta(meta) for meta in metas_cliente]
+
 	context = {
 		'cliente': cliente,
 		'habitos': habitos,
@@ -173,6 +182,7 @@ def dashboard(request):
 		'progresso_atual': progresso_atual,
 		'periodo_progresso': periodo_progresso,
 		'atividades_recentes': atividades_recentes,
+		'metas_resumo': metas_resumo,
 	}
 
 	return render(request, 'pagina_interna/dashboard.html', context)

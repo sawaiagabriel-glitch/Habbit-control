@@ -5,7 +5,9 @@ from django.db import transaction
 from django.db.models import Sum
 from django.utils import timezone
 
-from .models import MetaCiclo, RegistroAtividade
+from .models import Meta, MetaCiclo, PlanoMetaAssistente, RegistroAtividade
+
+OBJETIVO_RESUMO_MAX_CHARS = 160
 
 
 def inicio_periodo(data, periodo):
@@ -54,6 +56,81 @@ def _progresso_do_ciclo(meta, inicio, fim):
         data__gte=inicio,
         data__lte=fim,
     ).aggregate(total=Sum('quantidade'))['total'] or 0
+
+
+def _obter_plano_assistente(meta):
+    """Retorna o PlanoMetaAssistente ligado à meta, ou None."""
+    try:
+        return meta.plano_assistente
+    except PlanoMetaAssistente.DoesNotExist:
+        return None
+
+
+def obter_resumo_meta(meta, hoje=None):
+    """Monta um resumo read-only da meta (progresso, streak e plano opcional).
+
+    Não cria ``MetaCiclo``, não altera o banco e não chama OpenAI. Reutiliza a
+    mesma regra de soma de atividades do ciclo civil corrente.
+
+    Args:
+        meta: Instância de ``Meta`` (preferencialmente com ``habito`` carregado).
+        hoje: Data de referência opcional (útil em testes).
+
+    Returns:
+        Dicionário com progresso atual, percentual, estado, streak e, quando
+        existir, dados resumidos de ``PlanoMetaAssistente``.
+    """
+    hoje = hoje or timezone.localdate()
+    inicio = inicio_periodo(hoje, meta.periodo)
+    fim = _proximo_inicio(inicio, meta.periodo) - timedelta(days=1)
+    progresso = _progresso_do_ciclo(meta, inicio, fim)
+
+    if meta.quantidade_minima > 0:
+        percentual = min(100, round(progresso / meta.quantidade_minima * 100, 1))
+    else:
+        percentual = 0
+
+    if progresso >= meta.quantidade_minima:
+        estado = MetaCiclo.ESTADO_CUMPRIDA
+        estado_display = 'Cumprida'
+    else:
+        estado = MetaCiclo.ESTADO_ATIVA
+        estado_display = 'Ativa'
+
+    plano = _obter_plano_assistente(meta)
+    objetivo_principal = plano.objetivo_principal if plano else None
+    objetivo_resumo = None
+    if objetivo_principal:
+        if len(objetivo_principal) <= OBJETIVO_RESUMO_MAX_CHARS:
+            objetivo_resumo = objetivo_principal
+        else:
+            objetivo_resumo = objetivo_principal[: OBJETIVO_RESUMO_MAX_CHARS - 1].rstrip() + '…'
+
+    return {
+        'meta': meta,
+        'meta_id': meta.pk,
+        'habito_nome': meta.habito.nome_habito,
+        'quantidade_minima': meta.quantidade_minima,
+        'periodo': meta.periodo,
+        'periodo_display': meta.get_periodo_display(),
+        'progresso': progresso,
+        'percentual': percentual,
+        'estado': estado,
+        'estado_display': estado_display,
+        'streak': meta.streak,
+        'tem_plano': plano is not None,
+        'titulo_meta': plano.titulo_meta if plano else meta.habito.nome_habito,
+        'objetivo_principal': objetivo_principal,
+        'objetivo_resumo': objetivo_resumo,
+        'prazo_semanas': plano.duracao_semanas if plano else None,
+        'nivel': plano.nivel if plano else None,
+        'justificativa': plano.justificativa if plano else None,
+        'criterio_sucesso': plano.criterio_sucesso if plano else None,
+        'plano_recuperacao': plano.plano_recuperacao if plano else None,
+        'etapas': list(plano.etapas) if plano and plano.etapas else [],
+        'url_plano': f'/metas/#meta-{meta.pk}',
+        'plano': plano,
+    }
 
 
 def _atualizar_progresso_ciclo(meta, ciclo):
@@ -159,3 +236,40 @@ def atualizar_ciclos_meta(meta, hoje=None):
 
     _calcular_streak(meta, ciclos, hoje, inicio_atual)
     return ciclos
+
+
+@transaction.atomic
+def criar_meta_com_plano_assistente(*, habito, quantidade_minima, periodo, plano=None):
+    """Cria a Meta e, quando houver, o ``PlanoMetaAssistente`` na mesma transação.
+
+    Args:
+        habito: Hábito positivo titular da meta.
+        quantidade_minima: Objetivo operacional da Meta.
+        periodo: Período civil da Meta.
+        plano: Dict normalizado do plano ou ``None`` para meta sem plano.
+
+    Returns:
+        A ``Meta`` recém-criada (com ciclos inicializados).
+    """
+    meta = Meta(
+        habito=habito,
+        quantidade_minima=quantidade_minima,
+        periodo=periodo,
+    )
+    meta.save()
+
+    if plano:
+        PlanoMetaAssistente.objects.create(
+            meta=meta,
+            titulo_meta=plano['titulo_meta'],
+            objetivo_principal=plano['objetivo_principal'],
+            duracao_semanas=plano['duracao_semanas'],
+            nivel=plano.get('nivel') or '',
+            justificativa=plano.get('justificativa') or '',
+            criterio_sucesso=plano['criterio_sucesso'],
+            plano_recuperacao=plano['plano_recuperacao'],
+            etapas=plano.get('etapas') or [],
+        )
+
+    atualizar_ciclos_meta(meta)
+    return meta

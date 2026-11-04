@@ -136,6 +136,63 @@
     color: #344B50;
 }
 
+.goal-habito-ref {
+    margin: 6px 0 0;
+    color: #637276;
+    font-size: 0.92rem;
+}
+
+.goal-plano-completo {
+    margin-top: 16px;
+    display: grid;
+    gap: 12px;
+}
+
+.goal-plano-bloco {
+    margin: 0;
+}
+
+.goal-plano-label {
+    margin: 0 0 4px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    color: #5A7278;
+}
+
+.goal-plano-valor {
+    margin: 0;
+    color: #243F45;
+    line-height: 1.45;
+}
+
+.goal-plano-etapas {
+    margin: 0;
+    padding-left: 1.2rem;
+    display: grid;
+    gap: 10px;
+    color: #243F45;
+}
+
+.goal-plano-etapas p {
+    margin: 4px 0 0;
+    color: #526367;
+}
+
+.goal-plano-etapa-semanas {
+    display: inline-block;
+    margin-left: 8px;
+    font-size: 0.85rem;
+    color: #637276;
+}
+
+.goal-card-highlight {
+    outline: 2px solid #006B68;
+    box-shadow: 0 0 0 4px rgba(0, 107, 104, 0.18);
+    transition: outline-color 0.2s ease, box-shadow 0.2s ease;
+}
+
 .goal-delete-form {
     display: flex;
     justify-content: flex-end;
@@ -1397,6 +1454,66 @@
 /* ============================================
    DASHBOARD
    ============================================ */
+
+.dashboard-metas-lista {
+    display: grid;
+    gap: 16px;
+}
+
+.dashboard-meta-card {
+    padding: 20px 22px;
+    margin: 0;
+}
+
+.dashboard-meta-titulo {
+    margin: 0 0 8px;
+    color: #004B5E;
+    font-size: 1.15rem;
+}
+
+.dashboard-meta-subtitulo,
+.dashboard-meta-progresso {
+    margin: 0 0 6px;
+    color: #526367;
+}
+
+.dashboard-meta-dl {
+    margin: 12px 0 0;
+    display: grid;
+    gap: 10px;
+}
+
+.dashboard-meta-dl dt {
+    margin: 0;
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    color: #5A7278;
+}
+
+.dashboard-meta-dl dd {
+    margin: 2px 0 0;
+    color: #243F45;
+    line-height: 1.4;
+}
+
+.dashboard-meta-link {
+    display: inline-block;
+    margin-top: 14px;
+    color: #006B68;
+    font-weight: 700;
+    text-decoration: none;
+}
+
+.dashboard-meta-link:hover,
+.dashboard-meta-link:focus-visible {
+    text-decoration: underline;
+}
+
+.dashboard-metas-empty {
+    margin: 0;
+}
 
 .dashboard-section {
     margin-bottom: 24px;

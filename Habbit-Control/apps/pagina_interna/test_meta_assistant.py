@@ -23,8 +23,10 @@ from apps.pagina_interna.meta_assistant import (
     sugerir_meta,
     sugerir_meta_com_ia,
     sugerir_meta_deterministica,
+    validar_payload_criacao_meta_assistente,
 )
-from apps.pagina_interna.models import Habito, Meta
+from apps.pagina_interna.models import Habito, Meta, MetaCiclo, PlanoMetaAssistente
+from apps.pagina_interna.services import obter_resumo_meta
 
 
 class MetaAssistantUnitTest(TestCase):
@@ -710,26 +712,23 @@ class MetaAssistantEndpointTest(TestCase):
         self.assertContains(res, 'assistant-chat-log')
         self.assertContains(res, 'assistant-chat-input')
         self.assertContains(res, 'O que você quer alcançar com esse hábito?')
-        self.assertContains(res, 'Usar esta meta')
+        self.assertContains(res, 'Usar e criar esta meta')
         self.assertContains(res, 'Começar novamente')
         self.assertContains(res, 'enviarMensagemAssistente')
         self.assertContains(res, 'historicoAssistente')
+        self.assertContains(res, 'usarECriarMetaAssistente')
         self.assertContains(res, f'data-freq-valor="{self.habito_positivo.frequencia_atual_valor}"')
 
-    def test_usar_esta_meta_preenche_apenas_campos_existentes(self):
+    def test_usar_e_criar_meta_chama_endpoint_de_criacao(self):
         self.client.post(reverse('login'), {
             'email': self.cliente.email,
             'password': 'senha123',
         })
         res = self.client.get(reverse('metas'))
         conteudo = res.content.decode('utf-8')
-        self.assertIn('aplicarSugestaoNoFormulario', conteudo)
-        bloco = conteudo.split('function aplicarSugestaoNoFormulario')[1].split('function ')[0]
-        self.assertIn("getElementById('id_habito')", bloco)
-        self.assertIn("getElementById('id_quantidade_minima')", bloco)
-        self.assertIn("getElementById('id_periodo')", bloco)
-        self.assertNotIn("getElementById('id_plano')", bloco)
-        self.assertNotIn('historicoAssistente', bloco)
+        self.assertIn('usarECriarMetaAssistente', conteudo)
+        self.assertIn('assistente/criar', conteudo)
+        self.assertNotIn('aplicarSugestaoNoFormulario', conteudo)
 
     def test_endpoint_fallback_responde_meta_pronta_sem_etapas(self):
         self.client.post(reverse('login'), {
@@ -889,7 +888,219 @@ class MetaAssistantEndpointIATest(TestCase):
         data = res.json()
         self.assertEqual(data['estado'], 'meta_pronta')
         self.assertEqual(Meta.objects.count(), metas_antes)
+        self.assertEqual(PlanoMetaAssistente.objects.count(), 0)
         for meta in Meta.objects.all():
             serializado = json.dumps(meta.__dict__, default=str)
             self.assertNotIn('XYZ123', serializado)
             self.assertNotIn('plano_recuperacao', serializado)
+
+
+class ValidacaoPayloadCriacaoMetaTest(TestCase):
+    def test_payload_sem_plano_rico_cria_apenas_campos_operacionais(self):
+        resultado = validar_payload_criacao_meta_assistente({
+            'quantidade_sugerida': 3,
+            'periodo': 'semana',
+        })
+        self.assertEqual(resultado['quantidade_minima'], 3)
+        self.assertEqual(resultado['periodo'], 'semana')
+        self.assertIsNone(resultado['plano'])
+
+    def test_payload_com_plano_completo_normaliza_plano(self):
+        resultado = validar_payload_criacao_meta_assistente(_meta_pronta_valida())
+        self.assertIsNotNone(resultado['plano'])
+        self.assertEqual(resultado['plano']['titulo_meta'], 'Correr 10 km continuamente')
+        self.assertEqual(len(resultado['plano']['etapas']), 3)
+
+    def test_payload_com_plano_incompleto_rejeita(self):
+        with self.assertRaises(ValueError):
+            validar_payload_criacao_meta_assistente({
+                'quantidade_sugerida': 3,
+                'periodo': 'semana',
+                'titulo_meta': 'Só título',
+            })
+
+
+@override_settings(OPENAI_API_KEY='')
+class AssistenteCriarMetaEndpointTest(TestCase):
+    def setUp(self):
+        self.client = Client()
+        self.cliente = Cliente.objects.create(
+            nome_completo='Cliente Criar Meta',
+            idade=28,
+            email='criar.meta@teste.com',
+            password='senha123',
+            lgpd=True,
+        )
+        self.outro = Cliente.objects.create(
+            nome_completo='Outro Criar Meta',
+            idade=33,
+            email='outro.criar@teste.com',
+            password='senha123',
+            lgpd=True,
+        )
+        self.habito = Habito.objects.create(
+            cliente=self.cliente,
+            tipo_habito='positivo',
+            nome_habito='Corrida',
+            frequencia_atual_valor=2,
+            frequencia_atual_periodo='semana',
+            frequencia_desejada_valor=4,
+            frequencia_desejada_periodo='semana',
+        )
+        self.habito_outro = Habito.objects.create(
+            cliente=self.outro,
+            tipo_habito='positivo',
+            nome_habito='Natação',
+            frequencia_atual_valor=2,
+            frequencia_atual_periodo='semana',
+            frequencia_desejada_valor=3,
+            frequencia_desejada_periodo='semana',
+        )
+
+    def _login(self, cliente=None):
+        cliente = cliente or self.cliente
+        self.client.post(reverse('login'), {
+            'email': cliente.email,
+            'password': 'senha123',
+        })
+
+    def _post_criar(self, payload):
+        return self.client.post(
+            reverse('assistente_criar_meta'),
+            data=json.dumps(payload),
+            content_type='application/json',
+        )
+
+    def test_cria_meta_manual_sem_plano_quando_payload_simples(self):
+        self._login()
+        res = self._post_criar({
+            'habito_id': self.habito.id,
+            'quantidade_minima': 3,
+            'periodo': 'semana',
+        })
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertTrue(data['sucesso'])
+        self.assertFalse(data['tem_plano'])
+        meta = Meta.objects.get(pk=data['meta_id'])
+        self.assertEqual(meta.quantidade_minima, 3)
+        self.assertFalse(PlanoMetaAssistente.objects.filter(meta=meta).exists())
+
+    def test_cria_meta_com_plano_assistente_em_transacao(self):
+        self._login()
+        payload = {
+            'habito_id': self.habito.id,
+            **_meta_pronta_valida(),
+        }
+        res = self._post_criar(payload)
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertTrue(data['sucesso'])
+        self.assertTrue(data['tem_plano'])
+        meta = Meta.objects.get(pk=data['meta_id'])
+        plano = PlanoMetaAssistente.objects.get(meta=meta)
+        self.assertEqual(plano.titulo_meta, 'Correr 10 km continuamente')
+        self.assertEqual(plano.objetivo_principal, 'Completar uma corrida contínua de 10 km')
+        self.assertEqual(plano.duracao_semanas, 8)
+        self.assertEqual(len(plano.etapas), 3)
+        self.assertEqual(data['redirect_url'], f'/metas/#meta-{meta.id}')
+
+    def test_excluir_meta_remove_plano_por_cascade(self):
+        self._login()
+        res = self._post_criar({
+            'habito_id': self.habito.id,
+            **_meta_pronta_valida(),
+        })
+        meta_id = res.json()['meta_id']
+        self.assertEqual(PlanoMetaAssistente.objects.filter(meta_id=meta_id).count(), 1)
+        Meta.objects.get(pk=meta_id).delete()
+        self.assertEqual(PlanoMetaAssistente.objects.filter(meta_id=meta_id).count(), 0)
+
+    def test_nao_cria_meta_de_outro_cliente(self):
+        self._login()
+        res = self._post_criar({
+            'habito_id': self.habito_outro.id,
+            'quantidade_minima': 2,
+            'periodo': 'semana',
+        })
+        self.assertEqual(res.status_code, 404)
+        self.assertEqual(Meta.objects.filter(habito=self.habito_outro).count(), 0)
+
+    @patch('apps.pagina_interna.meta_views.conversar_meta_assistente')
+    def test_endpoint_criar_nao_chama_openai(self, mock_conversar):
+        self._login()
+        res = self._post_criar({
+            'habito_id': self.habito.id,
+            **_meta_pronta_valida(),
+        })
+        self.assertEqual(res.status_code, 200)
+        mock_conversar.assert_not_called()
+
+    def test_pagina_metas_exibe_plano_completo_e_ancora(self):
+        self._login()
+        criar = self._post_criar({
+            'habito_id': self.habito.id,
+            **_meta_pronta_valida(),
+        })
+        meta_id = criar.json()['meta_id']
+        res = self.client.get(reverse('metas'))
+        self.assertEqual(res.status_code, 200)
+        self.assertContains(res, f'id="meta-{meta_id}"')
+        self.assertContains(res, 'Correr 10 km continuamente')
+        self.assertContains(res, 'Completar uma corrida contínua de 10 km')
+        self.assertContains(res, '8 semanas')
+        self.assertContains(res, 'Adaptação')
+        self.assertContains(res, 'destacarMetaPorHash')
+
+
+class ObterResumoMetaHelperTest(TestCase):
+    def setUp(self):
+        self.cliente = Cliente.objects.create(
+            nome_completo='Cliente Resumo',
+            idade=30,
+            email='resumo@teste.com',
+            password='senha123',
+            lgpd=True,
+        )
+        self.habito = Habito.objects.create(
+            cliente=self.cliente,
+            tipo_habito='positivo',
+            nome_habito='Academia',
+            frequencia_atual_valor=2,
+            frequencia_atual_periodo='semana',
+            frequencia_desejada_valor=4,
+            frequencia_desejada_periodo='semana',
+        )
+        self.meta = Meta.objects.create(
+            habito=self.habito,
+            quantidade_minima=3,
+            periodo='semana',
+        )
+
+    def test_resumo_readonly_nao_cria_ciclo(self):
+        ciclos_antes = MetaCiclo.objects.count()
+        resumo = obter_resumo_meta(self.meta)
+        self.assertEqual(MetaCiclo.objects.count(), ciclos_antes)
+        self.assertEqual(resumo['quantidade_minima'], 3)
+        self.assertEqual(resumo['habito_nome'], 'Academia')
+        self.assertFalse(resumo['tem_plano'])
+        self.assertIn('progresso', resumo)
+        self.assertIn('percentual', resumo)
+
+    def test_resumo_com_plano_assistente(self):
+        PlanoMetaAssistente.objects.create(
+            meta=self.meta,
+            titulo_meta='Correr 10 km continuamente',
+            objetivo_principal='Completar uma corrida contínua de 10 km.',
+            duracao_semanas=8,
+            nivel='equilibrada',
+            justificativa='Baseado no histórico.',
+            criterio_sucesso='Completar a prova.',
+            plano_recuperacao='Repetir a etapa.',
+            etapas=[{'titulo': 'Adaptação', 'inicio_semana': 1, 'fim_semana': 2, 'descricao': 'Leve'}],
+        )
+        resumo = obter_resumo_meta(self.meta)
+        self.assertTrue(resumo['tem_plano'])
+        self.assertEqual(resumo['titulo_meta'], 'Correr 10 km continuamente')
+        self.assertEqual(resumo['prazo_semanas'], 8)
+        self.assertEqual(resumo['url_plano'], f'/metas/#meta-{self.meta.id}')

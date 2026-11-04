@@ -15,6 +15,7 @@ urlpatterns = [
     path('metas/<int:meta_id>/compartilhar/', meta_views.ativar_compartilhamento_meta, name='ativar_compartilhamento_meta'),
     path('metas/<int:meta_id>/desativar-compartilhamento/', meta_views.desativar_compartilhamento_meta, name='desativar_compartilhamento_meta'),
     path('metas/assistente/sugerir/', meta_views.assistente_sugerir_meta, name='assistente_sugerir_meta'),
+    path('metas/assistente/criar/', meta_views.assistente_criar_meta, name='assistente_criar_meta'),
     path('meta/publica/<str:token>/', meta_views.meta_publica, name='meta_publica'),
     path('parceiro/metas/', meta_views.metas_partilhadas, name='metas_partilhadas'),
     path('editar_habito/<int:habito_id>/', views.editar_habito, name='editar_habito'),

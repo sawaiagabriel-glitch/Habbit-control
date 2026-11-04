@@ -235,3 +235,36 @@ class MetaCiclo(models.Model):
         if self.meta.quantidade_minima <= 0:
             return 0
         return min(100, round(self.progresso / self.meta.quantidade_minima * 100, 1))
+
+
+class PlanoMetaAssistente(models.Model):
+    """Plano estruturado gerado pelo assistente e vinculado a uma Meta.
+
+    Metas manuais não possuem este registro. A exclusão da Meta remove o plano
+    automaticamente via CASCADE.
+    """
+    meta = models.OneToOneField(
+        Meta,
+        on_delete=models.CASCADE,
+        related_name='plano_assistente',
+        verbose_name='Meta',
+    )
+    titulo_meta = models.CharField(max_length=160, verbose_name='Título da meta')
+    objetivo_principal = models.CharField(
+        max_length=300,
+        verbose_name='Objetivo principal',
+    )
+    duracao_semanas = models.PositiveSmallIntegerField(verbose_name='Prazo em semanas')
+    nivel = models.CharField(max_length=20, blank=True, default='', verbose_name='Nível')
+    justificativa = models.TextField(blank=True, default='', verbose_name='Justificativa')
+    criterio_sucesso = models.TextField(verbose_name='Critério de sucesso')
+    plano_recuperacao = models.TextField(verbose_name='Plano de recuperação')
+    etapas = models.JSONField(default=list, verbose_name='Etapas do plano')
+    data_criacao = models.DateTimeField(auto_now_add=True, verbose_name='Data de criação')
+
+    def __str__(self):
+        return f'Plano assistente: {self.titulo_meta}'
+
+    class Meta:
+        verbose_name = 'Plano de Meta do Assistente'
+        verbose_name_plural = 'Planos de Meta do Assistente'

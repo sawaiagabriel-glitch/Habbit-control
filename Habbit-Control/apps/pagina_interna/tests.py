@@ -429,6 +429,123 @@ class DashboardViewTest(TestCase):
         self.assertRedirects(response, reverse('dashboard'))
         self.assertEqual(self.client.session.get('cliente_email'), 'dashboard@example.com')
 
+    def test_dashboard_sem_metas_mostra_estado_vazio(self):
+        self._autenticar()
+        response = self.client.get(self.dashboard_url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Você ainda não possui metas')
+        self.assertContains(response, 'Criar uma meta')
+        self.assertContains(response, reverse('metas'))
+        self.assertEqual(list(response.context['metas_resumo']), [])
+
+    def test_dashboard_mostra_meta_manual_normalmente(self):
+        from apps.pagina_interna.models import Meta, RegistroAtividade
+
+        meta = Meta.objects.create(
+            habito=self.habito_positivo,
+            quantidade_minima=3,
+            periodo='semana',
+        )
+        RegistroAtividade.objects.filter(habito=self.habito_positivo).delete()
+        RegistroAtividade.objects.create(
+            habito=self.habito_positivo,
+            data=date.today(),
+            quantidade=2,
+        )
+        self._autenticar()
+        response = self.client.get(self.dashboard_url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Academia')
+        self.assertContains(response, '2 / 3')
+        self.assertContains(response, 'vezes por')
+        self.assertNotContains(response, 'Ver plano completo')
+        resumo = response.context['metas_resumo'][0]
+        self.assertFalse(resumo['tem_plano'])
+        self.assertEqual(resumo['meta_id'], meta.id)
+        self.assertEqual(resumo['progresso'], 2)
+
+    def test_dashboard_mostra_meta_assistente_com_resumo(self):
+        from apps.pagina_interna.models import Meta, PlanoMetaAssistente, RegistroAtividade, MetaCiclo
+        from unittest.mock import patch
+
+        meta = Meta.objects.create(
+            habito=self.habito_positivo,
+            quantidade_minima=3,
+            periodo='semana',
+            streak=1,
+        )
+        PlanoMetaAssistente.objects.create(
+            meta=meta,
+            titulo_meta='Correr 10 km continuamente',
+            objetivo_principal='Completar uma corrida contínua de 10 km.',
+            duracao_semanas=8,
+            nivel='equilibrada',
+            justificativa='Contexto coletado.',
+            criterio_sucesso='Chegar aos 10 km.',
+            plano_recuperacao='Repetir etapa.',
+            etapas=[
+                {
+                    'titulo': 'Adaptação',
+                    'inicio_semana': 1,
+                    'fim_semana': 2,
+                    'descricao': 'Treinos leves',
+                }
+            ],
+        )
+        RegistroAtividade.objects.filter(habito=self.habito_positivo).delete()
+        RegistroAtividade.objects.create(
+            habito=self.habito_positivo,
+            data=date.today(),
+            quantidade=2,
+        )
+
+        ciclos_antes = MetaCiclo.objects.count()
+        with patch('apps.pagina_interna.meta_assistant.conversar_meta_assistente') as mock_ia:
+            with patch('openai.OpenAI') as mock_openai:
+                self._autenticar()
+                response = self.client.get(self.dashboard_url)
+
+        self.assertEqual(response.status_code, 200)
+        mock_ia.assert_not_called()
+        mock_openai.assert_not_called()
+        self.assertEqual(MetaCiclo.objects.count(), ciclos_antes)
+
+        self.assertContains(response, 'Correr 10 km continuamente')
+        self.assertContains(response, 'Completar uma corrida contínua de 10 km.')
+        self.assertContains(response, '8 semanas')
+        self.assertContains(response, '2 / 3')
+        self.assertContains(response, 'Ver plano completo')
+        self.assertContains(response, f'/metas/#meta-{meta.id}')
+        # Dashboard não deve listar etapas completas
+        self.assertNotContains(response, 'Treinos leves')
+        self.assertNotContains(response, 'Contexto coletado.')
+
+        resumo = response.context['metas_resumo'][0]
+        self.assertTrue(resumo['tem_plano'])
+        self.assertEqual(resumo['titulo_meta'], 'Correr 10 km continuamente')
+        self.assertEqual(resumo['progresso'], 2)
+        self.assertEqual(resumo['streak'], 1)
+        self.assertEqual(resumo['prazo_semanas'], 8)
+
+        # Cards/gráficos existentes continuam presentes
+        self.assertEqual(response.context['total_habitos'], 2)
+        self.assertContains(response, 'Progresso Atual')
+        self.assertContains(response, 'Meus Hábitos')
+
+    def test_dashboard_nao_mostra_meta_de_outro_cliente(self):
+        from apps.pagina_interna.models import Meta
+
+        Meta.objects.create(
+            habito=self.habito_outro,
+            quantidade_minima=9,
+            periodo='semana',
+        )
+        self._autenticar()
+        response = self.client.get(self.dashboard_url)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(list(response.context['metas_resumo']), [])
+        self.assertNotContains(response, 'Hábito Secreto')
+
 
 class ConfiguracoesSegurancaTest(SimpleTestCase):
     def tearDown(self):

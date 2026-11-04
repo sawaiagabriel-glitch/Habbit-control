@@ -52,6 +52,59 @@
         </div>
     </div>
 
+    <!-- Metas (resumo) -->
+    <div class="dashboard-section dashboard-metas-section">
+        <div class="section-header" style="margin-bottom: 16px;">
+            <h2 class="section-title">Minhas Metas</h2>
+        </div>
+        {% if metas_resumo %}
+            <div class="dashboard-metas-lista">
+                {% for item in metas_resumo %}
+                    {% if item.tem_plano %}
+                    <article class="info-card dashboard-meta-card dashboard-meta-card-assistente">
+                        <h3 class="dashboard-meta-titulo">🎯 {{ item.titulo_meta }}</h3>
+                        <dl class="dashboard-meta-dl">
+                            <div>
+                                <dt>Objetivo</dt>
+                                <dd>{{ item.objetivo_resumo }}</dd>
+                            </div>
+                            <div>
+                                <dt>Meta operacional</dt>
+                                <dd>{{ item.quantidade_minima }} vezes por {{ item.periodo_display|lower }}</dd>
+                            </div>
+                            <div>
+                                <dt>Prazo</dt>
+                                <dd>{{ item.prazo_semanas }} semanas</dd>
+                            </div>
+                            <div>
+                                <dt>Progresso atual</dt>
+                                <dd>{{ item.progresso }} / {{ item.quantidade_minima }} — {{ item.percentual|floatformat:0 }}%</dd>
+                            </div>
+                            <div>
+                                <dt>Sequência</dt>
+                                <dd>{{ item.streak }} período{% if item.streak != 1 %}s{% endif %}</dd>
+                            </div>
+                        </dl>
+                        <a href="{{ item.url_plano }}" class="dashboard-meta-link">Ver plano completo</a>
+                    </article>
+                    {% else %}
+                    <article class="info-card dashboard-meta-card">
+                        <h3 class="dashboard-meta-titulo">🎯 {{ item.habito_nome }}</h3>
+                        <p class="dashboard-meta-subtitulo">{{ item.quantidade_minima }} vezes por {{ item.periodo_display|lower }}</p>
+                        <p class="dashboard-meta-progresso">Progresso: {{ item.progresso }} / {{ item.quantidade_minima }} — {{ item.percentual|floatformat:0 }}%</p>
+                    </article>
+                    {% endif %}
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="info-card empty-state dashboard-metas-empty">
+                <h3 class="empty-state-title">Você ainda não possui metas</h3>
+                <p class="empty-state-text">Crie uma meta para começar a acompanhar seu progresso.</p>
+                <a href="{% url 'metas' %}" class="btn-empty-state">Criar uma meta</a>
+            </div>
+        {% endif %}
+    </div>
+
     {% if habitos %}
         <!-- 2. Progresso Atual -->
         <div class="info-card dashboard-section">

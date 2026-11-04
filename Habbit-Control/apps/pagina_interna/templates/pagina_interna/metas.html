@@ -131,15 +131,15 @@
                         <p class="assistant-plan-label">💡 Por que essa meta foi sugerida</p>
                         <p id="plan-justificativa" class="assistant-plan-value"></p>
                     </div>
-                    <p class="assistant-plan-note">Este plano é apenas orientação e não é salvo com a meta.</p>
+                    <p class="assistant-plan-note">Ao confirmar, a meta e o plano serão salvos na sua conta.</p>
                 </div>
 
                 <div class="assistant-actions">
                     <button type="button" class="btn-assistant-cancel" onclick="comecarNovamenteAssistente()">Começar novamente</button>
                     <button type="button" class="btn-assistant-cancel" onclick="fecharAssistenteMetas()">Fechar</button>
-                    <button type="button" class="btn-assistant-use" onclick="aplicarSugestaoNoFormulario()">
+                    <button type="button" class="btn-assistant-use" id="btn-usar-criar-meta" onclick="usarECriarMetaAssistente()">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                        <span>Usar esta meta</span>
+                        <span>Usar e criar esta meta</span>
                     </button>
                 </div>
             </div>
@@ -148,16 +148,73 @@
 
     <section class="goal-list">
         <h2 class="section-title">Metas dos meus hábitos</h2>
-        {% for meta in metas %}
-            {% with ciclo=meta.ciclos.last %}
-            <article class="info-card goal-card">
+        {% for item in metas_resumo %}
+            {% with meta=item.meta %}
+            <article class="info-card goal-card{% if item.tem_plano %} goal-card-assistente{% endif %}" id="meta-{{ meta.id }}">
                 <div class="goal-card-heading">
-                    <div><h3>{{ meta.habito.nome_habito }}</h3><p>{{ meta.quantidade_minima }} atividades por {{ meta.get_periodo_display|lower }}</p></div>
-                    <span class="goal-status goal-status-{{ ciclo.estado|default:'ativa' }}">{{ ciclo.get_estado_display|default:'Ativa' }}</span>
+                    <div>
+                        <h3>{% if item.tem_plano %}🎯 {{ item.titulo_meta }}{% else %}{{ meta.habito.nome_habito }}{% endif %}</h3>
+                        {% if item.tem_plano %}
+                            <p class="goal-habito-ref">Hábito: {{ meta.habito.nome_habito }}</p>
+                        {% else %}
+                            <p>{{ meta.quantidade_minima }} atividades por {{ item.periodo_display|lower }}</p>
+                        {% endif %}
+                    </div>
+                    <span class="goal-status goal-status-{{ item.estado }}">{{ item.estado_display }}</span>
                 </div>
-                <div class="goal-progress-meta"><span>Progresso do período</span><strong>{{ ciclo.progresso|default:0 }} / {{ meta.quantidade_minima }} ({{ ciclo.percentual|default:0 }}%)</strong></div>
-                <progress class="goal-progress" value="{{ ciclo.percentual|default:0 }}" max="100" aria-label="{{ ciclo.percentual|default:0 }}% da meta"></progress>
-                <p class="goal-streak">Sequência atual: <strong>{{ meta.streak }}</strong> período(s)</p>
+
+                {% if item.tem_plano %}
+                <div class="goal-plano-completo">
+                    <div class="goal-plano-bloco">
+                        <p class="goal-plano-label">Objetivo</p>
+                        <p class="goal-plano-valor">{{ item.objetivo_principal }}</p>
+                    </div>
+                    <div class="goal-plano-bloco">
+                        <p class="goal-plano-label">Meta operacional</p>
+                        <p class="goal-plano-valor">{{ item.quantidade_minima }} vezes por {{ item.periodo_display|lower }}</p>
+                    </div>
+                    <div class="goal-plano-bloco">
+                        <p class="goal-plano-label">Prazo</p>
+                        <p class="goal-plano-valor">{{ item.prazo_semanas }} semanas</p>
+                    </div>
+                    {% if item.etapas %}
+                    <div class="goal-plano-bloco">
+                        <p class="goal-plano-label">Etapas</p>
+                        <ol class="goal-plano-etapas">
+                            {% for etapa in item.etapas %}
+                            <li>
+                                <strong>{{ etapa.titulo }}</strong>
+                                <span class="goal-plano-etapa-semanas">Semanas {{ etapa.inicio_semana }}–{{ etapa.fim_semana }}</span>
+                                <p>{{ etapa.descricao }}</p>
+                            </li>
+                            {% endfor %}
+                        </ol>
+                    </div>
+                    {% endif %}
+                    {% if item.criterio_sucesso %}
+                    <div class="goal-plano-bloco">
+                        <p class="goal-plano-label">Critério de sucesso</p>
+                        <p class="goal-plano-valor">{{ item.criterio_sucesso }}</p>
+                    </div>
+                    {% endif %}
+                    {% if item.plano_recuperacao %}
+                    <div class="goal-plano-bloco">
+                        <p class="goal-plano-label">Se sair do ritmo</p>
+                        <p class="goal-plano-valor">{{ item.plano_recuperacao }}</p>
+                    </div>
+                    {% endif %}
+                    {% if item.justificativa %}
+                    <div class="goal-plano-bloco">
+                        <p class="goal-plano-label">Por que essa meta foi sugerida</p>
+                        <p class="goal-plano-valor">{{ item.justificativa }}</p>
+                    </div>
+                    {% endif %}
+                </div>
+                {% endif %}
+
+                <div class="goal-progress-meta"><span>Progresso do período</span><strong>{{ item.progresso }} / {{ item.quantidade_minima }} ({{ item.percentual }}%)</strong></div>
+                <progress class="goal-progress" value="{{ item.percentual }}" max="100" aria-label="{{ item.percentual }}% da meta"></progress>
+                <p class="goal-streak">Sequência atual: <strong>{{ item.streak }}</strong> período(s)</p>
                 {% if meta.parceiros.exists %}<p class="goal-sharing">Partilhada com: {% for parceiro in meta.parceiros.all %}{{ parceiro.nome_completo }}{% if not forloop.last %}, {% endif %}{% endfor %}</p>{% endif %}
 
                 <!-- Compartilhamento Público -->
@@ -542,28 +599,86 @@ function renderizarPlanoSugerido(body) {
     bloco.style.display = 'block';
 }
 
-function aplicarSugestaoNoFormulario() {
+function usarECriarMetaAssistente() {
     if (!sugestaoMetaAtual) return;
 
-    // Preenche apenas os campos atuais do formulário de Meta (plano/histórico não são persistidos).
-    const selectHabito = document.getElementById('id_habito');
-    const inputQtd = document.getElementById('id_quantidade_minima');
-    const selectPeriodo = document.getElementById('id_periodo');
     const meta = sugestaoMetaAtual.meta || sugestaoMetaAtual;
-
-    if (selectHabito) selectHabito.value = sugestaoMetaAtual.habito_id;
-    if (inputQtd) inputQtd.value = meta.quantidade_sugerida || sugestaoMetaAtual.quantidade_sugerida;
-    if (selectPeriodo) selectPeriodo.value = meta.periodo || sugestaoMetaAtual.periodo;
-
-    fecharAssistenteMetas();
-
-    const form = document.querySelector('.goal-form');
-    if (form) {
-        form.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        form.classList.add('goal-form-highlight');
-        setTimeout(() => { form.classList.remove('goal-form-highlight'); }, 2000);
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    const btn = document.getElementById('btn-usar-criar-meta');
+    const originalHtml = btn ? btn.innerHTML : '';
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span>Criando...</span>';
     }
+
+    const payload = {
+        habito_id: sugestaoMetaAtual.habito_id,
+        quantidade_minima: meta.quantidade_sugerida || sugestaoMetaAtual.quantidade_sugerida,
+        periodo: meta.periodo || sugestaoMetaAtual.periodo,
+        titulo_meta: meta.titulo_meta || sugestaoMetaAtual.titulo_meta,
+        objetivo_principal: meta.objetivo_principal || sugestaoMetaAtual.objetivo_principal,
+        nivel: meta.nivel || sugestaoMetaAtual.nivel,
+        mensagem: meta.mensagem || sugestaoMetaAtual.mensagem,
+        justificativa: meta.justificativa || sugestaoMetaAtual.justificativa,
+        duracao_semanas: meta.duracao_semanas || sugestaoMetaAtual.duracao_semanas,
+        criterio_sucesso: meta.criterio_sucesso || sugestaoMetaAtual.criterio_sucesso,
+        plano_recuperacao: meta.plano_recuperacao || sugestaoMetaAtual.plano_recuperacao,
+        etapas: meta.etapas || sugestaoMetaAtual.etapas,
+        plano: {
+            titulo_meta: meta.titulo_meta || sugestaoMetaAtual.titulo_meta,
+            objetivo_principal: meta.objetivo_principal || sugestaoMetaAtual.objetivo_principal,
+            nivel: meta.nivel || sugestaoMetaAtual.nivel,
+            mensagem: meta.mensagem || sugestaoMetaAtual.mensagem,
+            justificativa: meta.justificativa || sugestaoMetaAtual.justificativa,
+            duracao_semanas: meta.duracao_semanas || sugestaoMetaAtual.duracao_semanas,
+            criterio_sucesso: meta.criterio_sucesso || sugestaoMetaAtual.criterio_sucesso,
+            plano_recuperacao: meta.plano_recuperacao || sugestaoMetaAtual.plano_recuperacao,
+            etapas: meta.etapas || sugestaoMetaAtual.etapas
+        }
+    };
+
+    fetch("{% url 'assistente_criar_meta' %}", {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': csrfToken
+        },
+        body: JSON.stringify(payload)
+    })
+    .then(res => res.json().then(data => ({ status: res.status, body: data })))
+    .then(({ status, body }) => {
+        if (status !== 200 || !body.sucesso) {
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = originalHtml;
+            }
+            mostrarAlertaAssistente(body.erro || 'Não foi possível criar a meta.');
+            return;
+        }
+        window.location.href = body.redirect_url || ('/metas/#meta-' + body.meta_id);
+    })
+    .catch(function () {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = originalHtml;
+        }
+        mostrarAlertaAssistente('Erro de conexão ao criar a meta.');
+    });
 }
+
+function destacarMetaPorHash() {
+    const hash = window.location.hash || '';
+    const match = hash.match(/^#meta-(\d+)$/);
+    if (!match) return;
+    const card = document.getElementById('meta-' + match[1]);
+    if (!card) return;
+    card.classList.add('goal-card-highlight');
+    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    setTimeout(function () { card.classList.remove('goal-card-highlight'); }, 2600);
+}
+
+document.addEventListener('DOMContentLoaded', destacarMetaPorHash);
+window.addEventListener('hashchange', destacarMetaPorHash);
 
 function copiarLinkPublico(inputId, btn) {
     const input = document.getElementById(inputId);

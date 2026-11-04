@@ -1,17 +1,23 @@
-from datetime import timedelta
 import json
 
 from django.contrib import messages
 from django.http import JsonResponse
 from django.shortcuts import redirect, render
-from django.utils import timezone
 
 from apps.login_cadastro_app.models import Parceiro
 from .access import get_cliente_from_session
 from .forms import MetaForm
-from .meta_assistant import conversar_meta_assistente, sanitizar_mensagem
+from .meta_assistant import (
+    conversar_meta_assistente,
+    sanitizar_mensagem,
+    validar_payload_criacao_meta_assistente,
+)
 from .models import Habito, Meta
-from .services import atualizar_ciclos_meta, inicio_periodo, _proximo_inicio, _progresso_do_ciclo
+from .services import (
+    atualizar_ciclos_meta,
+    criar_meta_com_plano_assistente,
+    obter_resumo_meta,
+)
 
 
 def metas(request):
@@ -35,11 +41,13 @@ def metas(request):
 
     metas_cliente = (
         Meta.objects.filter(habito__cliente=cliente)
-        .select_related('habito')
+        .select_related('habito', 'plano_assistente')
         .prefetch_related('parceiros')
     )
     for meta in metas_cliente:
         atualizar_ciclos_meta(meta)
+
+    metas_resumo = [obter_resumo_meta(meta) for meta in metas_cliente]
 
     habitos_assistente = [
         {
@@ -55,6 +63,7 @@ def metas(request):
         'cliente': cliente,
         'form': form,
         'metas': metas_cliente,
+        'metas_resumo': metas_resumo,
         'habitos_assistente': habitos_assistente,
     })
 
@@ -172,27 +181,17 @@ def meta_publica(request, token):
     if meta is None:
         return render(request, 'pagina_interna/meta_publica_indisponivel.html', status=404)
 
-    hoje = timezone.localdate()
-    inicio = inicio_periodo(hoje, meta.periodo)
-    fim = _proximo_inicio(inicio, meta.periodo) - timedelta(days=1)
-    progresso = _progresso_do_ciclo(meta, inicio, fim)
-
-    if meta.quantidade_minima > 0:
-        percentual = min(100, round(progresso / meta.quantidade_minima * 100, 1))
-    else:
-        percentual = 0
-
-    estado_str = 'Cumprida' if progresso >= meta.quantidade_minima else 'Ativa'
+    resumo = obter_resumo_meta(meta)
 
     return render(request, 'pagina_interna/meta_publica.html', {
-        'nome_habito': meta.habito.nome_habito,
-        'quantidade_minima': meta.quantidade_minima,
-        'periodo': meta.get_periodo_display(),
-        'progresso': progresso,
-        'percentual': percentual,
-        'percentual_css': f'{percentual:.1f}',
-        'estado': estado_str,
-        'streak': meta.streak,
+        'nome_habito': resumo['habito_nome'],
+        'quantidade_minima': resumo['quantidade_minima'],
+        'periodo': resumo['periodo_display'],
+        'progresso': resumo['progresso'],
+        'percentual': resumo['percentual'],
+        'percentual_css': f"{resumo['percentual']:.1f}",
+        'estado': resumo['estado_display'],
+        'streak': resumo['streak'],
     })
 
 
@@ -292,3 +291,93 @@ def assistente_sugerir_meta(request):
             resposta['mensagem'] = meta['mensagem']
 
     return JsonResponse(resposta)
+
+
+def assistente_criar_meta(request):
+    """Cria Meta (+ PlanoMetaAssistente quando houver) a partir do assistente.
+
+    Aceita POST JSON com hábito, quantidade, período e dados estruturados do plano.
+    Não chama OpenAI; apenas revalida o payload e persiste em ``transaction.atomic``.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'sucesso': False, 'erro': 'Método não permitido.'}, status=405)
+
+    cliente, _ = get_cliente_from_session(request)
+    if cliente is None:
+        return JsonResponse({'sucesso': False, 'erro': 'Usuário não autenticado.'}, status=401)
+
+    if request.content_type == 'application/json':
+        try:
+            data = json.loads(request.body.decode('utf-8'))
+        except (ValueError, UnicodeDecodeError):
+            return JsonResponse({'sucesso': False, 'erro': 'Formato JSON inválido.'}, status=400)
+    else:
+        data = request.POST.dict()
+
+    habito_id = data.get('habito_id')
+    if not habito_id:
+        return JsonResponse({'sucesso': False, 'erro': 'Selecione um hábito para a meta.'}, status=400)
+
+    try:
+        habito_id_int = int(habito_id)
+    except (TypeError, ValueError):
+        return JsonResponse({'sucesso': False, 'erro': 'Identificador de hábito inválido.'}, status=400)
+
+    habito = Habito.objects.filter(pk=habito_id_int, cliente=cliente).first()
+    if habito is None:
+        return JsonResponse(
+            {'sucesso': False, 'erro': 'Hábito não encontrado ou não pertence à sua conta.'},
+            status=404,
+        )
+
+    if habito.tipo_habito != 'positivo':
+        return JsonResponse(
+            {'sucesso': False, 'erro': 'Apenas hábitos positivos podem receber metas.'},
+            status=400,
+        )
+
+    if habito.metas.exists():
+        return JsonResponse(
+            {'sucesso': False, 'erro': 'Este hábito já possui uma meta cadastrada.'},
+            status=400,
+        )
+
+    plano_bruto = data.get('plano') if isinstance(data.get('plano'), dict) else {}
+    payload_validacao = {
+        'quantidade_minima': data.get('quantidade_minima', data.get('quantidade_sugerida')),
+        'periodo': data.get('periodo'),
+        'titulo_meta': data.get('titulo_meta', plano_bruto.get('titulo_meta')),
+        'objetivo_principal': data.get(
+            'objetivo_principal',
+            plano_bruto.get('objetivo_principal'),
+        ),
+        'nivel': data.get('nivel', plano_bruto.get('nivel')),
+        'mensagem': data.get('mensagem', plano_bruto.get('mensagem')),
+        'justificativa': data.get('justificativa', plano_bruto.get('justificativa')),
+        'duracao_semanas': data.get('duracao_semanas', plano_bruto.get('duracao_semanas')),
+        'criterio_sucesso': data.get('criterio_sucesso', plano_bruto.get('criterio_sucesso')),
+        'plano_recuperacao': data.get(
+            'plano_recuperacao',
+            plano_bruto.get('plano_recuperacao'),
+        ),
+        'etapas': data.get('etapas', plano_bruto.get('etapas')),
+    }
+
+    try:
+        normalizado = validar_payload_criacao_meta_assistente(payload_validacao)
+    except ValueError as exc:
+        return JsonResponse({'sucesso': False, 'erro': str(exc)}, status=400)
+
+    meta = criar_meta_com_plano_assistente(
+        habito=habito,
+        quantidade_minima=normalizado['quantidade_minima'],
+        periodo=normalizado['periodo'],
+        plano=normalizado['plano'],
+    )
+
+    return JsonResponse({
+        'sucesso': True,
+        'meta_id': meta.id,
+        'tem_plano': normalizado['plano'] is not None,
+        'redirect_url': f'/metas/#meta-{meta.id}',
+    })

@@ -73,8 +73,14 @@
                         </a>
                     </li>
                     <li>
-
-                        <a href="{% url 'metas' %}" class="nav-item {% if request.resolver_match.url_name == 'metas' %}active{% endif %}">Metas</a>
+                        <a href="{% url 'metas' %}" class="nav-item {% if request.resolver_match.url_name == 'metas' %}active{% endif %}">
+                            <svg class="nav-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                <circle cx="12" cy="12" r="6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                <circle cx="12" cy="12" r="2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                            Metas
+                        </a>
                     </li>
                     {% endif %}
 

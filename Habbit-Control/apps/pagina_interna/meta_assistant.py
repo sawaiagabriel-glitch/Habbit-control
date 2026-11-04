@@ -478,6 +478,96 @@ def _validar_meta_pronta(dados: dict[str, Any]) -> dict:
     return resultado
 
 
+def _tem_campos_plano_ricos(dados: dict[str, Any]) -> bool:
+    """Indica se o payload traz campos típicos de plano do assistente."""
+    chaves = (
+        'titulo_meta',
+        'objetivo_principal',
+        'duracao_semanas',
+        'criterio_sucesso',
+        'plano_recuperacao',
+        'etapas',
+    )
+    return any(dados.get(chave) not in (None, '', []) for chave in chaves)
+
+
+def validar_payload_criacao_meta_assistente(dados: dict[str, Any]) -> dict[str, Any]:
+    """Valida o payload de criação de Meta (+ plano opcional) a partir do assistente.
+
+    Sempre exige ``quantidade_sugerida``/``quantidade_minima`` e ``periodo`` válidos.
+    Se houver campos de plano rico, exige plano completo e coerente; caso contrário
+    retorna apenas os campos da Meta operacional (sem ``plano``).
+
+    Returns:
+        Dict com ``quantidade_minima``, ``periodo`` e, quando aplicável, ``plano``.
+
+    Raises:
+        ValueError: Se quantidade/período forem inválidos ou o plano rico estiver incompleto.
+    """
+    if not isinstance(dados, dict):
+        raise ValueError('Dados da meta inválidos.')
+
+    quantidade = dados.get('quantidade_minima', dados.get('quantidade_sugerida'))
+    if isinstance(quantidade, bool) or not isinstance(quantidade, int):
+        try:
+            quantidade = int(quantidade)
+        except (TypeError, ValueError) as exc:
+            raise ValueError('Quantidade mínima inválida.') from exc
+    if quantidade < 1:
+        raise ValueError('A quantidade mínima deve ser maior que zero.')
+
+    periodo = str(dados.get('periodo', '')).strip().lower()
+    if periodo not in PERIODOS_VALIDOS:
+        raise ValueError('Período inválido.')
+
+    limite = LIMITES_SEGURANCA.get(periodo, 100)
+    if quantidade > limite:
+        raise ValueError('Quantidade acima do limite de segurança.')
+
+    resultado: dict[str, Any] = {
+        'quantidade_minima': quantidade,
+        'periodo': periodo,
+        'plano': None,
+    }
+
+    if not _tem_campos_plano_ricos(dados):
+        return resultado
+
+    try:
+        meta_pronta = _validar_meta_pronta({
+            'titulo_meta': dados.get('titulo_meta'),
+            'objetivo_principal': dados.get('objetivo_principal'),
+            'quantidade_sugerida': quantidade,
+            'periodo': periodo,
+            'nivel': dados.get('nivel') or 'equilibrada',
+            'mensagem': dados.get('mensagem') or 'Meta criada com o assistente.',
+            'justificativa': dados.get('justificativa') or 'Plano gerado pelo assistente.',
+            'duracao_semanas': dados.get('duracao_semanas'),
+            'criterio_sucesso': dados.get('criterio_sucesso'),
+            'plano_recuperacao': dados.get('plano_recuperacao'),
+            'etapas': dados.get('etapas'),
+        })
+    except MetaAssistantIAError as exc:
+        raise ValueError(str(exc)) from exc
+
+    if 'etapas' not in meta_pronta or 'duracao_semanas' not in meta_pronta:
+        raise ValueError(
+            'Plano do assistente incompleto. Informe título, objetivo, prazo e etapas.'
+        )
+
+    resultado['plano'] = {
+        'titulo_meta': meta_pronta['titulo_meta'],
+        'objetivo_principal': meta_pronta['objetivo_principal'],
+        'duracao_semanas': meta_pronta['duracao_semanas'],
+        'nivel': meta_pronta.get('nivel', ''),
+        'justificativa': meta_pronta.get('justificativa', ''),
+        'criterio_sucesso': meta_pronta['criterio_sucesso'],
+        'plano_recuperacao': meta_pronta['plano_recuperacao'],
+        'etapas': meta_pronta['etapas'],
+    }
+    return resultado
+
+
 def _validar_resposta_conversa(
     dados: dict[str, Any],
     *,
