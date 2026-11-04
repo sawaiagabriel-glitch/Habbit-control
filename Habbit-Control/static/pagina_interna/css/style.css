@@ -603,29 +603,6 @@
     display: none;
 }
 
-.form-select:focus {
-    outline: none;
-    border-color: #004B5E;
-    background-color: white;
-    box-shadow: 0 0 0 4px rgba(0, 75, 94, 0.1);
-}
-
-.select-arrow {
-    position: absolute;
-    right: 16px;
-    top: 50%;
-    transform: translateY(-50%);
-    pointer-events: none;
-    color: #A0A0A0;
-    transition: transform 0.3s ease;
-    z-index: 1;
-}
-
-.form-select:focus + .select-arrow {
-    transform: translateY(-50%) rotate(180deg);
-    color: #004B5E;
-}
-
 .form-actions {
     display: flex;
     justify-content: space-between;
@@ -1276,44 +1253,6 @@
     transform: translateY(-2px);
     box-shadow: 0 6px 20px rgba(0, 75, 94, 0.35);
     background: linear-gradient(135deg, #006B8F 0%, #004B5E 100%);
-}
-
-/* Mensagens */
-.messages-container {
-    margin-bottom: 30px;
-}
-
-.message {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 14px 18px;
-    border-radius: 10px;
-    margin-bottom: 12px;
-    font-size: 0.95rem;
-    animation: slideIn 0.3s ease-out;
-}
-
-.message-success {
-    background-color: #D1FAE5;
-    color: #065F46;
-    border-left: 4px solid #10B981;
-}
-
-.message-error {
-    background-color: #FEE2E2;
-    color: #991B1B;
-    border-left: 4px solid #EF4444;
-}
-
-.message-info {
-    background-color: #DBEAFE;
-    color: #1E40AF;
-    border-left: 4px solid #3B82F6;
-}
-
-.message-icon {
-    flex-shrink: 0;
 }
 
 /* ============================================

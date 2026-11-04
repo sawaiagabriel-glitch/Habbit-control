@@ -41,13 +41,6 @@ body {
     border-radius: 16px;
 }
 
-.welcome-title {
-    font-size: 2.5rem;
-    font-weight: bold;
-    color: #4A4A4A;
-    margin-bottom: 10px;
-}
-
 .welcome-subtitle {
     font-size: 1.1rem;
     color: #A0A0A0;
@@ -150,52 +143,10 @@ body {
     transform: translateY(-2px);
 }
 
-/* Login Section */
-.login-section {
-    text-align: center;
-    width: 100%;
-    max-width: 600px;
-}
-
-.separator {
-    position: relative;
-    margin-bottom: 30px;
-}
-
-.separator::before {
-    content: '';
-    position: absolute;
-    top: 50%;
-    left: 0;
-    right: 0;
-    height: 1px;
-    background-color: #A0A0A0;
-    z-index: 1;
-}
-
-.separator-text {
-    background-color: #F5F6F8;
-    color: #A0A0A0;
-    padding: 0 20px;
-    position: relative;
-    z-index: 2;
-    font-size: 0.9rem;
-}
-
-.login-subtitle {
-    color: #A0A0A0;
-    font-size: 0.9rem;
-    margin-top: 15px;
-}
-
 /* Responsive Design */
 @media (max-width: 768px) {
     .container {
         padding: 15px;
-    }
-    
-    .welcome-title {
-        font-size: 2rem;
     }
     
     .cards-container {
@@ -210,9 +161,6 @@ body {
  }
 
 @media (max-width: 480px) {
-    .welcome-title {
-        font-size: 1.8rem;
-    }
     
     .welcome-subtitle {
         font-size: 1rem;
@@ -366,33 +314,6 @@ body {
     color: #A0A0A0;
 }
 
-/* Input with Button */
-.input-with-button {
-    display: flex;
-    gap: 10px;
-}
-
-.input-with-button input {
-    flex: 1;
-}
-
-.btn-send-code {
-    padding: 12px 24px;
-    background-color: #004B5E;
-    color: white;
-    border: none;
-    border-radius: 8px;
-    font-weight: 600;
-    font-size: 0.95rem;
-    cursor: pointer;
-    white-space: nowrap;
-    transition: all 0.3s ease;
-}
-
-.btn-send-code:hover {
-    background-color: #FF8C42;
-}
-
 /* Checkbox Groups */
 .checkbox-group {
     margin-bottom: 20px;
@@ -488,14 +409,6 @@ body {
     
     .form-title {
         font-size: 1.6rem;
-    }
-    
-    .input-with-button {
-        flex-direction: column;
-    }
-    
-    .btn-send-code {
-        width: 100%;
     }
 }
 
@@ -644,10 +557,10 @@ body {
 }
 
 .page-title {
-    font-size: 2rem;
-    color: #333;
-    margin-bottom: 30px;
+    font-size: 28px;
     font-weight: 600;
+    color: #333;
+    margin: 0;
 }
 
 /* Info Cards */
@@ -748,149 +661,6 @@ body {
     background-color: white;
 }
 
-/* Upload Section */
-.upload-title {
-    font-size: 1.1rem;
-    font-weight: 600;
-    color: #4A4A4A;
-    margin-bottom: 20px;
-}
-
-.upload-area {
-    border: 2px dashed #D0D0D0;
-    border-radius: 12px;
-    padding: 60px 40px;
-    text-align: center;
-    background-color: #FAFAFA;
-    transition: all 0.3s ease;
-}
-
-.upload-area:hover {
-    border-color: #004B5E;
-    background-color: #F5F5F5;
-}
-
-.upload-icon {
-    margin: 0 auto 20px;
-    opacity: 0.6;
-}
-
-.upload-text-bold {
-    font-size: 1.1rem;
-    font-weight: 600;
-    color: #4A4A4A;
-    margin-bottom: 8px;
-}
-
-.upload-text {
-    font-size: 0.95rem;
-    color: #A0A0A0;
-    margin-bottom: 20px;
-}
-
-.upload-btn {
-    padding: 12px 30px;
-    background-color: #E0E0E0;
-    color: #4A4A4A;
-    border: none;
-    border-radius: 8px;
-    font-size: 1rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.3s ease;
-}
-
-.upload-btn:hover {
-    background-color: #D0D0D0;
-}
-
-/* Tabs */
-.tabs {
-    display: flex;
-    gap: 10px;
-    margin-bottom: 25px;
-}
-
-.tab-btn {
-    padding: 12px 30px;
-    background-color: white;
-    color: #4A4A4A;
-    border: none;
-    border-radius: 8px;
-    font-size: 1rem;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-}
-
-.tab-btn:hover {
-    background-color: #F5F5F5;
-}
-
-.tab-btn.active {
-    background-color: #FF8C42;
-    color: white;
-    box-shadow: 0 4px 10px rgba(229, 57, 53, 0.3);
-}
-
-/* Table */
-.table-container {
-    background: white;
-    border-radius: 12px;
-    padding: 25px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-    overflow-x: auto;
-}
-
-.warranty-table {
-    width: 100%;
-    border-collapse: collapse;
-}
-
-.warranty-table thead {
-    background-color: #F8F9FA;
-}
-
-.warranty-table th {
-    padding: 15px;
-    text-align: left;
-    font-weight: 600;
-    color: #4A4A4A;
-    font-size: 0.9rem;
-    border-bottom: 2px solid #E0E0E0;
-}
-
-.warranty-table td {
-    padding: 15px;
-    border-bottom: 1px solid #F0F0F0;
-    color: #666;
-    font-size: 0.95rem;
-}
-
-.warranty-table tbody tr:hover {
-    background-color: #F8F9FA;
-}
-
-/* Status Badges */
-.status-badge {
-    padding: 6px 16px;
-    border-radius: 20px;
-    font-size: 0.85rem;
-    font-weight: 600;
-    display: inline-block;
-}
-
-.status-pendente {
-    background-color: #FFB300;
-    color: white;
-}
-
-.status-ativa {
-    background-color: #4CAF50;
-    color: white;
-}
-
 /* Responsive Design for Dashboard */
 @media (max-width: 1024px) {
     .sidebar {
@@ -938,218 +708,6 @@ body {
     .info-card {
         padding: 20px;
     }
-
-    .warranty-table {
-        font-size: 0.85rem;
-    }
-
-    .warranty-table th,
-    .warranty-table td {
-        padding: 10px 8px;
-    }
-}
-
-/* ============================================
-   ADMIN PAGES STYLES
-   ============================================ */
-
-.admin-page {
-    padding: 20px;
-    background-color: #F5F5F5;
-    min-height: 100vh;
-}
-
-.page-header {
-    margin-bottom: 20px;
-}
-
-.page-title {
-    font-size: 28px;
-    font-weight: 600;
-    color: #333;
-    margin: 0;
-}
-
-.content-card {
-    background: white;
-    border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    overflow: hidden;
-}
-
-.tabs-container {
-    border-bottom: 1px solid #E5E5E5;
-}
-
-.tabs {
-    display: flex;
-    margin: 0;
-    padding: 0;
-}
-
-.tab-button {
-    background: none;
-    border: none;
-    padding: 16px 24px;
-    font-size: 16px;
-    font-weight: 500;
-    color: #666;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    position: relative;
-}
-
-.tab-button.active {
-    background-color: #DC2626;
-    color: white;
-}
-
-.tab-button:hover:not(.active) {
-    background-color: #F5F5F5;
-    color: #333;
-}
-
-.table-container {
-    overflow-x: auto;
-}
-
-.warranty-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 14px;
-}
-
-.warranty-table thead {
-    background-color: #F8F9FA;
-}
-
-.warranty-table th {
-    padding: 16px 12px;
-    text-align: left;
-    font-weight: 600;
-    color: #666;
-    border-bottom: 1px solid #E5E5E5;
-}
-
-.warranty-table th.details-column {
-    color: #DC2626;
-}
-
-.warranty-table td {
-    padding: 16px 12px;
-    border-bottom: 1px solid #F0F0F0;
-    vertical-align: middle;
-    text-align: left;
-}
-
-.warranty-table tbody tr:hover {
-    background-color: #F8F9FA;
-}
-
-.client-cell {
-    min-width: 200px;
-}
-
-.client-info {
-    display: flex;
-    flex-direction: column;
-}
-
-.client-name {
-    font-weight: 600;
-    color: #333;
-    margin-bottom: 4px;
-}
-
-.client-email {
-    font-size: 12px;
-    color: #666;
-}
-
-.status-badge {
-    display: inline-block;
-    padding: 4px 12px;
-    border-radius: 20px;
-    font-size: 12px;
-    font-weight: 500;
-    text-transform: uppercase;
-    text-align: center;
-}
-
-.status-badge.pending {
-    background-color: #FEF3C7;
-    color: #92400E;
-}
-
-.status-badge.active {
-    background-color: #D1FAE5;
-    color: #065F46;
-}
-
-.details-cell {
-    text-align: left;
-}
-
-.details-btn {
-    background-color: #DC2626;
-    color: white;
-    border: none;
-    padding: 8px 16px;
-    border-radius: 4px;
-    font-size: 12px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: background-color 0.3s ease;
-}
-
-.details-btn:hover {
-    background-color: #B91C1C;
-}
-
-/* Simple details button styling */
-.details-btn {
-    background-color: #f8f9fa;
-    color: #495057;
-    border: 1px solid #dee2e6;
-    padding: 6px 12px;
-    border-radius: 4px;
-    font-size: 12px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    display: inline-block;
-    text-align: center;
-}
-
-.details-btn:hover {
-    background-color: #e9ecef;
-    border-color: #adb5bd;
-    color: #212529;
-}
-
-/* Responsive design for admin pages */
-@media (max-width: 768px) {
-    .admin-page {
-        padding: 10px;
-    }
-    
-    .warranty-table {
-        font-size: 12px;
-    }
-    
-    .warranty-table th,
-    .warranty-table td {
-        padding: 12px 8px;
-    }
-    
-    .client-cell {
-        min-width: 150px;
-    }
-}
-
-.status-negada {
-    background-color: #FF8C42; /* Mesma cor vermelha do btn-login */
-    color: white;
 }
 
 /* Estilos para edição de campos */
@@ -1343,29 +901,7 @@ body {
     }
 }
 
-/* Toast sobreposto para notificações */
-.messages-toast-container {
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    z-index: 9999;
-    max-width: 400px;
-}
-
-.message-toast {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 16px 20px;
-    border-radius: 12px;
-    margin-bottom: 12px;
-    font-size: 0.95rem;
-    font-weight: 500;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-    animation: slideInFromRight 0.4s ease-out;
-    min-width: 300px;
-}
-
+/* Toast modifiers (usados com message-toast-top / message-toast-{{ tags }}) */
 .message-toast-success {
     background-color: #D1FAE5;
     color: #065F46;
@@ -1382,17 +918,6 @@ body {
     background-color: #DBEAFE;
     color: #1E40AF;
     border-left: 4px solid #3B82F6;
-}
-
-@keyframes slideInFromRight {
-    from {
-        opacity: 0;
-        transform: translateX(100%);
-    }
-    to {
-        opacity: 1;
-        transform: translateX(0);
-    }
 }
 
 /* Notificações sobrepostas no topo da página de cadastro */
@@ -2072,6 +1597,4 @@ body {
     transform: translateY(-50%) rotate(180deg);
     color: #004B5E;
 }
-
-
 

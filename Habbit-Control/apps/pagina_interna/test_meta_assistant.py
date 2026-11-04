@@ -715,9 +715,20 @@ class MetaAssistantEndpointTest(TestCase):
         self.assertContains(res, 'Usar e criar esta meta')
         self.assertContains(res, 'Começar novamente')
         self.assertContains(res, 'enviarMensagemAssistente')
-        self.assertContains(res, 'historicoAssistente')
         self.assertContains(res, 'usarECriarMetaAssistente')
+        self.assertContains(res, 'metas-page-config')
+        self.assertContains(res, 'pagina_interna/js/metas.js')
+        self.assertContains(res, 'pagina_interna/css/metas.css')
         self.assertContains(res, f'data-freq-valor="{self.habito_positivo.frequencia_atual_valor}"')
+
+        from pathlib import Path
+        metas_js = (
+            Path(__file__).resolve().parents[2]
+            / 'static' / 'pagina_interna' / 'js' / 'metas.js'
+        ).read_text(encoding='utf-8')
+        self.assertIn('historicoAssistente', metas_js)
+        self.assertIn('usarECriarMetaAssistente', metas_js)
+        self.assertIn('destacarMetaPorHash', metas_js)
 
     def test_usar_e_criar_meta_chama_endpoint_de_criacao(self):
         self.client.post(reverse('login'), {
@@ -728,6 +739,7 @@ class MetaAssistantEndpointTest(TestCase):
         conteudo = res.content.decode('utf-8')
         self.assertIn('usarECriarMetaAssistente', conteudo)
         self.assertIn('assistente/criar', conteudo)
+        self.assertIn('metas-page-config', conteudo)
         self.assertNotIn('aplicarSugestaoNoFormulario', conteudo)
 
     def test_endpoint_fallback_responde_meta_pronta_sem_etapas(self):
@@ -1050,7 +1062,13 @@ class AssistenteCriarMetaEndpointTest(TestCase):
         self.assertContains(res, 'Completar uma corrida contínua de 10 km')
         self.assertContains(res, '8 semanas')
         self.assertContains(res, 'Adaptação')
-        self.assertContains(res, 'destacarMetaPorHash')
+        self.assertContains(res, 'id="metas-page-config"')
+        from pathlib import Path
+        metas_js = (
+            Path(__file__).resolve().parents[2]
+            / 'static' / 'pagina_interna' / 'js' / 'metas.js'
+        ).read_text(encoding='utf-8')
+        self.assertIn('destacarMetaPorHash', metas_js)
 
 
 class ObterResumoMetaHelperTest(TestCase):

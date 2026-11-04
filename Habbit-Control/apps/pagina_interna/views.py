@@ -1,28 +1,112 @@
-from django.shortcuts import render, redirect
-from django.contrib.auth.decorators import login_required
+from datetime import date, datetime, timedelta
+import json
+
 from django.contrib import messages
-from django.http import JsonResponse
-from django.views.decorators.http import require_POST
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
-import json
+from django.core.validators import validate_email
+from django.db import IntegrityError
+from django.http import JsonResponse
+from django.shortcuts import redirect, render
+from django.views.decorators.http import require_POST
+
 from apps.login_cadastro_app.models import Cliente
 from .access import get_cliente_from_session
 from .models import Habito, Meta, RegistroAtividade
-from .services import atualizar_ciclos_meta
+from .progresso import obter_dados_relatorio
+from .services import atualizar_ciclos_meta, obter_resumo_meta
 
-# Create your views here.
+_MSG_LOGIN = 'Por favor, faça login para acessar esta página.'
+
+
+def _cliente_ou_redirect_login(request):
+	"""Resolve o Cliente da sessão ou devolve redirect para login com warning."""
+	cliente, _ = get_cliente_from_session(request)
+	if cliente:
+		return cliente, None
+	messages.warning(request, _MSG_LOGIN)
+	return None, redirect('login')
+
+
+def _habitos_do_cliente(cliente):
+	"""Lista de hábitos do cliente com contagens usadas nas páginas internas."""
+	habitos = Habito.objects.filter(cliente=cliente).order_by('-data_criacao')
+	return {
+		'habitos': habitos,
+		'total_habitos': habitos.count(),
+		'habitos_positivos': habitos.filter(tipo_habito='positivo').count(),
+		'habitos_negativos': habitos.filter(tipo_habito='negativo').count(),
+	}
+
+
+def _ler_campos_form_habito(post):
+	return {
+		'tipo_habito': post.get('tipo_habito'),
+		'nome_habito': post.get('nome_habito'),
+		'frequencia_atual_valor': post.get('frequencia_valor'),
+		'frequencia_atual_periodo': post.get('periodo'),
+		'frequencia_desejada_valor': post.get('frequencia_desejada_valor'),
+		'frequencia_desejada_periodo': post.get('periodo_desejado'),
+	}
+
+
+def _validar_campos_form_habito(campos):
+	"""Valida o formulário de hábito.
+
+	Returns:
+		``(dados, None)`` em sucesso ou ``(None, mensagem_de_erro)`` em falha.
+		As mensagens são as mesmas já usadas pelas views de cadastro/edição.
+	"""
+	obrigatorios = (
+		campos['tipo_habito'],
+		campos['nome_habito'],
+		campos['frequencia_atual_valor'],
+		campos['frequencia_atual_periodo'],
+		campos['frequencia_desejada_valor'],
+		campos['frequencia_desejada_periodo'],
+	)
+	if not all(obrigatorios):
+		return None, 'Por favor, preencha todos os campos.'
+
+	try:
+		freq_atual = int(campos['frequencia_atual_valor'])
+		freq_desejada = int(campos['frequencia_desejada_valor'])
+	except ValueError:
+		return None, 'Os valores de frequência devem ser números válidos.'
+
+	if freq_atual < 0 or freq_desejada < 0:
+		return None, 'As frequências não podem ser negativas.'
+
+	return {
+		'tipo_habito': campos['tipo_habito'],
+		'nome_habito': campos['nome_habito'],
+		'frequencia_atual_valor': freq_atual,
+		'frequencia_atual_periodo': campos['frequencia_atual_periodo'],
+		'frequencia_desejada_valor': freq_desejada,
+		'frequencia_desejada_periodo': campos['frequencia_desejada_periodo'],
+	}, None
+
+
+def _parse_data_iso(valor, padrao=None):
+	"""Converte string YYYY-MM-DD em date; em falha devolve ``padrao`` ou hoje."""
+	if padrao is None:
+		padrao = date.today()
+	try:
+		if isinstance(valor, str):
+			return datetime.strptime(valor, '%Y-%m-%d').date()
+		if isinstance(valor, date):
+			return valor
+	except (ValueError, TypeError):
+		pass
+	return padrao
+
 
 def alterar_dados(request):
 	try:
-		# Busca o cliente pelo email armazenado na sessão
-		cliente, _ = get_cliente_from_session(request)
-		
-		if not cliente:
-			# Se não há email na sessão ou cliente não encontrado, redireciona para login
-			messages.warning(request, 'Por favor, faça login para acessar esta página.')
-			return redirect('login')
-		
+		cliente, redirect_response = _cliente_ou_redirect_login(request)
+		if redirect_response:
+			return redirect_response
+
 		context = {'cliente': cliente}
 		return render(request, 'pagina_interna/alterar_dados_cliente.html', context)
 	except Exception as e:
@@ -32,108 +116,54 @@ def alterar_dados(request):
 
 
 def cadastro_garantia(request):
-	# Verifica se o usuário está autenticado
-	cliente, _ = get_cliente_from_session(request)
-	
-	if not cliente:
-		messages.warning(request, 'Por favor, faça login para acessar esta página.')
-		return redirect('login')
-	
+	cliente, redirect_response = _cliente_ou_redirect_login(request)
+	if redirect_response:
+		return redirect_response
+
 	messages.info(request, 'A funcionalidade de cadastro de garantia não está disponível no momento.')
 	return redirect('alterar_dados')
 
 
 def consultar_garantia(request):
-	# Verifica se o usuário está autenticado
-	cliente, _ = get_cliente_from_session(request)
-	
-	if not cliente:
-		messages.warning(request, 'Por favor, faça login para acessar esta página.')
-		return redirect('login')
-	
+	cliente, redirect_response = _cliente_ou_redirect_login(request)
+	if redirect_response:
+		return redirect_response
+
 	messages.info(request, 'A funcionalidade de consulta de garantia não está disponível no momento.')
 	return redirect('alterar_dados')
 
+
 def cadastro_habito(request):
-	# Verifica se o usuário está autenticado
-	cliente, _ = get_cliente_from_session(request)
-	
-	if not cliente:
-		messages.warning(request, 'Por favor, faça login para acessar esta página.')
-		return redirect('login')
-	
-	# Processa o formulário se for POST
+	cliente, redirect_response = _cliente_ou_redirect_login(request)
+	if redirect_response:
+		return redirect_response
+
 	if request.method == 'POST':
 		try:
-			from apps.pagina_interna.models import Habito
-			
-			# Obtém os dados do formulário
-			tipo_habito = request.POST.get('tipo_habito')
-			nome_habito = request.POST.get('nome_habito')
-			frequencia_atual_valor = request.POST.get('frequencia_valor')
-			frequencia_atual_periodo = request.POST.get('periodo')
-			frequencia_desejada_valor = request.POST.get('frequencia_desejada_valor')
-			frequencia_desejada_periodo = request.POST.get('periodo_desejado')
-			
-			# Validação básica
-			if not all([tipo_habito, nome_habito, frequencia_atual_valor, frequencia_atual_periodo, 
-			           frequencia_desejada_valor, frequencia_desejada_periodo]):
-				messages.error(request, 'Por favor, preencha todos os campos.')
+			dados, erro = _validar_campos_form_habito(_ler_campos_form_habito(request.POST))
+			if erro:
+				messages.error(request, erro)
 				return render(request, 'pagina_interna/cadastro_habito.html', {'cliente': cliente})
-			
-			# Converte e valida valores numéricos
-			try:
-				freq_atual = int(frequencia_atual_valor)
-				freq_desejada = int(frequencia_desejada_valor)
-				
-				# Valida que os valores sejam >= 0
-				if freq_atual < 0 or freq_desejada < 0:
-					messages.error(request, 'As frequências não podem ser negativas.')
-					return render(request, 'pagina_interna/cadastro_habito.html', {'cliente': cliente})
-			except ValueError:
-				messages.error(request, 'Os valores de frequência devem ser números válidos.')
-				return render(request, 'pagina_interna/cadastro_habito.html', {'cliente': cliente})
-			
-			# Cria o hábito
-			habito = Habito.objects.create(
-				cliente=cliente,
-				tipo_habito=tipo_habito,
-				nome_habito=nome_habito,
-				frequencia_atual_valor=freq_atual,
-				frequencia_atual_periodo=frequencia_atual_periodo,
-				frequencia_desejada_valor=freq_desejada,
-				frequencia_desejada_periodo=frequencia_desejada_periodo
-			)
-			
-			messages.success(request, f'Hábito "{nome_habito}" cadastrado com sucesso!')
+
+			Habito.objects.create(cliente=cliente, **dados)
+			messages.success(request, f'Hábito "{dados["nome_habito"]}" cadastrado com sucesso!')
 			return redirect('cadastro_habito')
-			
+
 		except Exception as e:
 			messages.error(request, f'Erro ao cadastrar hábito: {str(e)}')
 			return render(request, 'pagina_interna/cadastro_habito.html', {'cliente': cliente})
-	
-	# Renderiza a página normalmente para GET
+
 	return render(request, 'pagina_interna/cadastro_habito.html', {'cliente': cliente})
 
+
 def dashboard(request):
-	# Verifica se o usuário está autenticado
-	cliente, _ = get_cliente_from_session(request)
+	cliente, redirect_response = _cliente_ou_redirect_login(request)
+	if redirect_response:
+		return redirect_response
 
-	if not cliente:
-		messages.warning(request, 'Por favor, faça login para acessar esta página.')
-		return redirect('login')
+	stats = _habitos_do_cliente(cliente)
+	habitos = stats['habitos']
 
-	from apps.pagina_interna.models import Habito, Meta, RegistroAtividade
-	from apps.pagina_interna.progresso import obter_dados_relatorio
-	from apps.pagina_interna.services import obter_resumo_meta
-	from datetime import date
-
-	habitos = Habito.objects.filter(cliente=cliente).order_by('-data_criacao')
-	total_habitos = habitos.count()
-	habitos_positivos = habitos.filter(tipo_habito='positivo').count()
-	habitos_negativos = habitos.filter(tipo_habito='negativo').count()
-
-	# Atividade de hoje (mesma lógica de atividade_diaria para a data atual)
 	hoje = date.today()
 	atividade_hoje = []
 	for habito in habitos:
@@ -143,7 +173,6 @@ def dashboard(request):
 			'quantidade': registro.quantidade if registro else 0
 		})
 
-	# Progresso atual — reutiliza a regra de api_dados_relatorio (período padrão: semana)
 	habito_selecionado = None
 	progresso_atual = None
 	habito_id = request.GET.get('habito_id')
@@ -158,12 +187,10 @@ def dashboard(request):
 			habito_selecionado = habitos.first()
 		progresso_atual = obter_dados_relatorio(habito_selecionado, periodo_progresso)
 
-	# Atividade recente — registros do próprio usuário, ordenados por data
 	atividades_recentes = RegistroAtividade.objects.filter(
 		habito__cliente=cliente
 	).select_related('habito').order_by('-data', '-data_criacao')[:8]
 
-	# Metas — somente leitura via helper público (sem OpenAI / sem criar ciclos)
 	metas_cliente = (
 		Meta.objects.filter(habito__cliente=cliente)
 		.select_related('habito', 'plano_assistente')
@@ -174,9 +201,9 @@ def dashboard(request):
 	context = {
 		'cliente': cliente,
 		'habitos': habitos,
-		'total_habitos': total_habitos,
-		'habitos_positivos': habitos_positivos,
-		'habitos_negativos': habitos_negativos,
+		'total_habitos': stats['total_habitos'],
+		'habitos_positivos': stats['habitos_positivos'],
+		'habitos_negativos': stats['habitos_negativos'],
 		'atividade_hoje': atividade_hoje,
 		'habito_selecionado': habito_selecionado,
 		'progresso_atual': progresso_atual,
@@ -189,57 +216,34 @@ def dashboard(request):
 
 
 def progressos(request):
-	# Verifica se o usuário está autenticado
-	cliente, _ = get_cliente_from_session(request)
-	
-	if not cliente:
-		messages.warning(request, 'Por favor, faça login para acessar esta página.')
-		return redirect('login')
-	
-	# Busca todos os hábitos do cliente
-	from apps.pagina_interna.models import Habito
-	habitos = Habito.objects.filter(cliente=cliente).order_by('-data_criacao')
-	
-	# Calcula estatísticas
-	total_habitos = habitos.count()
-	habitos_positivos = habitos.filter(tipo_habito='positivo').count()
-	habitos_negativos = habitos.filter(tipo_habito='negativo').count()
-	
+	cliente, redirect_response = _cliente_ou_redirect_login(request)
+	if redirect_response:
+		return redirect_response
+
+	stats = _habitos_do_cliente(cliente)
 	context = {
 		'cliente': cliente,
-		'habitos': habitos,
-		'total_habitos': total_habitos,
-		'habitos_positivos': habitos_positivos,
-		'habitos_negativos': habitos_negativos
+		'habitos': stats['habitos'],
+		'total_habitos': stats['total_habitos'],
+		'habitos_positivos': stats['habitos_positivos'],
+		'habitos_negativos': stats['habitos_negativos'],
 	}
-	
+
 	return render(request, 'pagina_interna/progressos.html', context)
 
+
 def atividade_diaria(request):
-	# Verifica se o usuário está autenticado
-	cliente, _ = get_cliente_from_session(request)
-	
-	if not cliente:
-		messages.warning(request, 'Por favor, faça login para acessar esta página.')
-		return redirect('login')
-	
-	from apps.pagina_interna.models import Habito, RegistroAtividade
-	from datetime import date, timedelta
-	
-	# Obtém a data selecionada (padrão: hoje)
-	data_selecionada = request.GET.get('data', date.today().isoformat())
-	
-	try:
-		if isinstance(data_selecionada, str):
-			from datetime import datetime
-			data_selecionada = datetime.strptime(data_selecionada, '%Y-%m-%d').date()
-	except (ValueError, TypeError):
-		data_selecionada = date.today()
-	
-	# Busca todos os hábitos do cliente
+	cliente, redirect_response = _cliente_ou_redirect_login(request)
+	if redirect_response:
+		return redirect_response
+
+	data_selecionada = _parse_data_iso(
+		request.GET.get('data', date.today().isoformat()),
+		padrao=date.today(),
+	)
+
 	habitos = Habito.objects.filter(cliente=cliente).order_by('-data_criacao')
-	
-	# Para cada hábito, busca o registro da data selecionada
+
 	habitos_com_registros = []
 	for habito in habitos:
 		registro = RegistroAtividade.objects.filter(
@@ -250,44 +254,35 @@ def atividade_diaria(request):
 			'habito': habito,
 			'registro': registro
 		})
-	
+
 	context = {
 		'cliente': cliente,
 		'habitos_com_registros': habitos_com_registros,
 		'data_selecionada': data_selecionada,
 		'data_hoje': date.today(),
-		'data_minima': date.today() - timedelta(days=365),  # Permite selecionar até 1 ano atrás
+		'data_minima': date.today() - timedelta(days=365),
 		'data_maxima': date.today()
 	}
-	
+
 	return render(request, 'pagina_interna/atividade_diaria.html', context)
 
+
 def relatorios(request):
-	# Verifica se o usuário está autenticado
-	cliente, _ = get_cliente_from_session(request)
-	
-	if not cliente:
-		messages.warning(request, 'Por favor, faça login para acessar esta página.')
-		return redirect('login')
-	
-	from apps.pagina_interna.models import Habito
+	cliente, redirect_response = _cliente_ou_redirect_login(request)
+	if redirect_response:
+		return redirect_response
+
 	habitos = Habito.objects.filter(cliente=cliente).order_by('-data_criacao')
-	
+
 	context = {
 		'cliente': cliente,
 		'habitos': habitos
 	}
-	
+
 	return render(request, 'pagina_interna/relatorios.html', context)
 
 
 def api_dados_relatorio(request):
-	# API endpoint para buscar dados do gráfico de relatórios
-	from django.http import JsonResponse
-	from apps.pagina_interna.models import Habito
-	from apps.pagina_interna.progresso import obter_dados_relatorio
-
-	# Verifica se o usuário está autenticado
 	cliente, _ = get_cliente_from_session(request)
 
 	if not cliente:
@@ -296,12 +291,11 @@ def api_dados_relatorio(request):
 	if request.method == 'GET':
 		try:
 			habito_id = request.GET.get('habito_id')
-			periodo = request.GET.get('periodo', 'mes')  # dia, semana, mes, ano
+			periodo = request.GET.get('periodo', 'mes')
 
 			if not habito_id:
 				return JsonResponse({'success': False, 'error': 'Hábito não especificado'}, status=400)
 
-			# Busca o hábito e verifica se pertence ao cliente
 			try:
 				habito = Habito.objects.get(id=habito_id, cliente=cliente)
 			except Habito.DoesNotExist:
@@ -329,26 +323,22 @@ def api_dados_relatorio(request):
 
 	return JsonResponse({'success': False, 'error': 'Método não permitido'}, status=405)
 
+
 def editar_habito(request, habito_id):
-	# Verifica se o usuário está autenticado
 	cliente, _ = get_cliente_from_session(request)
-	
+
 	if not cliente:
-		if request.session.get('parceiro_email'):
-			return redirect('login')
-		messages.warning(request, 'Por favor, faça login para acessar esta página.')
+		# Parceiro autenticado também é barrado, sem flash de warning de cliente.
+		if not request.session.get('parceiro_email'):
+			messages.warning(request, _MSG_LOGIN)
 		return redirect('login')
-	
-	from apps.pagina_interna.models import Habito
-	
-	# Busca o hábito e verifica se pertence ao cliente
+
 	try:
 		habito = Habito.objects.get(id=habito_id, cliente=cliente)
 	except Habito.DoesNotExist:
 		messages.error(request, 'Hábito não encontrado ou você não tem permissão para editá-lo.')
 		return redirect('progressos')
-	
-	# Processa exclusão se for POST com 'excluir'
+
 	if request.method == 'POST' and 'excluir' in request.POST:
 		try:
 			nome_habito = habito.nome_habito
@@ -358,239 +348,190 @@ def editar_habito(request, habito_id):
 		except Exception as e:
 			messages.error(request, f'Erro ao excluir hábito: {str(e)}')
 			return redirect('progressos')
-	
-	# Processa edição se for POST
+
 	if request.method == 'POST':
 		try:
-			# Obtém os dados do formulário
-			tipo_habito = request.POST.get('tipo_habito')
-			nome_habito = request.POST.get('nome_habito')
-			frequencia_atual_valor = request.POST.get('frequencia_valor')
-			frequencia_atual_periodo = request.POST.get('periodo')
-			frequencia_desejada_valor = request.POST.get('frequencia_desejada_valor')
-			frequencia_desejada_periodo = request.POST.get('periodo_desejado')
-			
-			# Validação básica
-			if not all([tipo_habito, nome_habito, frequencia_atual_valor, frequencia_atual_periodo, 
-			           frequencia_desejada_valor, frequencia_desejada_periodo]):
-				messages.error(request, 'Por favor, preencha todos os campos.')
+			dados, erro = _validar_campos_form_habito(_ler_campos_form_habito(request.POST))
+			if erro:
+				messages.error(request, erro)
 				return render(request, 'pagina_interna/editar_habito.html', {'cliente': cliente, 'habito': habito})
-			
-			# Converte e valida valores numéricos
-			try:
-				freq_atual = int(frequencia_atual_valor)
-				freq_desejada = int(frequencia_desejada_valor)
-				
-				# Valida que os valores sejam >= 0
-				if freq_atual < 0 or freq_desejada < 0:
-					messages.error(request, 'As frequências não podem ser negativas.')
-					return render(request, 'pagina_interna/editar_habito.html', {'cliente': cliente, 'habito': habito})
-			except ValueError:
-				messages.error(request, 'Os valores de frequência devem ser números válidos.')
-				return render(request, 'pagina_interna/editar_habito.html', {'cliente': cliente, 'habito': habito})
-			
-			# Atualiza o hábito
-			# Uma meta existente depende de o hábito permanecer positivo.
-			if tipo_habito == 'negativo' and habito.metas.exists():
+
+			if dados['tipo_habito'] == 'negativo' and habito.metas.exists():
 				messages.error(request, 'Exclua a meta antes de converter o hábito para negativo.')
 				return render(request, 'pagina_interna/editar_habito.html', {'cliente': cliente, 'habito': habito})
 
-			habito.tipo_habito = tipo_habito
-			habito.nome_habito = nome_habito
-			habito.frequencia_atual_valor = freq_atual
-			habito.frequencia_atual_periodo = frequencia_atual_periodo
-			habito.frequencia_desejada_valor = freq_desejada
-			habito.frequencia_desejada_periodo = frequencia_desejada_periodo
+			habito.tipo_habito = dados['tipo_habito']
+			habito.nome_habito = dados['nome_habito']
+			habito.frequencia_atual_valor = dados['frequencia_atual_valor']
+			habito.frequencia_atual_periodo = dados['frequencia_atual_periodo']
+			habito.frequencia_desejada_valor = dados['frequencia_desejada_valor']
+			habito.frequencia_desejada_periodo = dados['frequencia_desejada_periodo']
 			habito.save()
-			
-			messages.success(request, f'Hábito "{nome_habito}" atualizado com sucesso!')
+
+			messages.success(request, f'Hábito "{dados["nome_habito"]}" atualizado com sucesso!')
 			return redirect('progressos')
-			
+
 		except Exception as e:
 			messages.error(request, f'Erro ao atualizar hábito: {str(e)}')
 			return render(request, 'pagina_interna/editar_habito.html', {'cliente': cliente, 'habito': habito})
-	
-	# Renderiza a página normalmente para GET
+
 	return render(request, 'pagina_interna/editar_habito.html', {'cliente': cliente, 'habito': habito})
 
+
 def registrar_atividade(request):
-	from django.http import JsonResponse
-	from apps.pagina_interna.models import Habito, RegistroAtividade
-	from datetime import date
-	
-	# Verifica se o usuário está autenticado
 	cliente, _ = get_cliente_from_session(request)
-	
+
 	if not cliente:
 		return JsonResponse({'success': False, 'error': 'Usuário não autenticado'}, status=401)
-	
+
 	if request.method == 'POST':
 		try:
-			import json
 			data = json.loads(request.body)
 			habito_id = data.get('habito_id')
 			quantidade = int(data.get('quantidade', 1))
 			data_registro = data.get('data', date.today().isoformat())
-			
-			# Valida a quantidade
+
 			if quantidade < 0:
 				return JsonResponse({'success': False, 'error': 'A quantidade não pode ser negativa'}, status=400)
-			
-			# Busca o hábito e verifica se pertence ao cliente
+
 			try:
 				habito = Habito.objects.get(id=habito_id, cliente=cliente)
 			except Habito.DoesNotExist:
 				return JsonResponse({'success': False, 'error': 'Hábito não encontrado'}, status=404)
-			
-			# Converte a data
+
+			# Mantém o comportamento anterior: data inválida sobe ValueError
+			# e responde com o mesmo erro genérico já coberto pelos testes.
 			if isinstance(data_registro, str):
-				from datetime import datetime
 				data_registro = datetime.strptime(data_registro, '%Y-%m-%d').date()
-			
-			# Busca ou cria o registro da data
+
 			registro, created = RegistroAtividade.objects.get_or_create(
 				habito=habito,
 				data=data_registro,
 				defaults={'quantidade': quantidade}
 			)
-			
+
 			if not created:
-				# Se já existe, atualiza a quantidade
 				registro.quantidade = quantidade
 				registro.save()
 
-			# Atualiza o ciclo corrente após persistir a atividade do hábito.
 			for meta in Meta.objects.filter(habito=habito):
 				atualizar_ciclos_meta(meta)
-			
+
 			return JsonResponse({
 				'success': True,
 				'quantidade': registro.quantidade,
 				'data': registro.data.isoformat()
 			})
-			
+
 		except ValueError:
 			return JsonResponse({'success': False, 'error': 'Quantidade inválida'}, status=400)
 		except Exception as e:
 			return JsonResponse({'success': False, 'error': str(e)}, status=400)
-	
-	return JsonResponse({'success': False, 'error': 'Método não permitido'}, status=405)
 
-def revenda_adm(request):
-	return render(request, 'pagina_interna/home.html') 
+	return JsonResponse({'success': False, 'error': 'Método não permitido'}, status=405)
 
 
 @require_POST
 def update_cliente(request):
-    try:
-        from django.core.validators import validate_email
-        from django.db import IntegrityError
+	try:
+		data = json.loads(request.body)
+		field = data.get('field')
+		value = data.get('value')
 
-        data = json.loads(request.body)
-        field = data.get('field')
-        value = data.get('value')
-        
-        # Validação básica
-        if not field or value is None: # value pode ser string vazia, mas não None
-            return JsonResponse({'success': False, 'error': 'Campo ou valor inválido'}, status=400)
-        
-        # 1. Busca o Cliente pelo email na sessão
-        cliente, cliente_email = get_cliente_from_session(request)
-        
-        if not cliente:
-            return JsonResponse({'success': False, 'error': 'Usuário não autenticado. Faça login novamente.'}, status=401)
-        
-        # 2. LISTA DE CAMPOS PERMITIDOS (profissao não está e não deve estar)
-        field_map = {
-            'nome_completo': 'nome_completo',
-            'idade': 'idade',
-            'email': 'email',
-            'password': 'password', # O JS manda 'password', o model tem 'password'
-            'cidade': 'cidade',
-            'estado': 'estado',
-        }
+		if not field or value is None:
+			return JsonResponse({'success': False, 'error': 'Campo ou valor inválido'}, status=400)
 
-        # Verifica se o campo enviado é permitido
-        if field not in field_map:
-            print(f"[ERRO] Tentativa de editar campo não permitido: {field}")
-            return JsonResponse({'success': False, 'error': f'Campo {field} não permitido'}, status=400)
-        
-        model_field = field_map[field]
-        response_value = None
+		cliente, cliente_email = get_cliente_from_session(request)
 
-        # 3. Validações e atualização por campo
-        if model_field == 'password':
-            if not value or not str(value).strip():
-                return JsonResponse({'success': False, 'error': 'A senha não pode ser vazia'}, status=400)
-            raw_password = str(value)
-            try:
-                validate_password(raw_password, user=cliente)
-            except ValidationError as e:
-                return JsonResponse({
-                    'success': False,
-                    'error': '; '.join(e.messages),
-                    'errors': list(e.messages)
-                }, status=400)
-            cliente.password = raw_password
-            response_value = None  # nunca devolver senha
-        elif model_field == 'nome_completo':
-            nome = str(value).strip()
-            if not nome:
-                return JsonResponse({'success': False, 'error': 'O nome completo não pode ficar vazio'}, status=400)
-            if len(nome) > 255:
-                return JsonResponse({'success': False, 'error': 'O nome completo é muito longo'}, status=400)
-            cliente.nome_completo = nome
-            response_value = nome
-        elif model_field == 'idade':
-            try:
-                idade = int(value)
-            except (TypeError, ValueError):
-                return JsonResponse({'success': False, 'error': 'A idade deve ser um número inteiro válido'}, status=400)
-            if idade < 0:
-                return JsonResponse({'success': False, 'error': 'A idade não pode ser negativa'}, status=400)
-            cliente.idade = idade
-            response_value = idade
-        elif model_field == 'email':
-            email = str(value).lower().strip()
-            try:
-                validate_email(email)
-            except ValidationError:
-                return JsonResponse({'success': False, 'error': 'Informe um e-mail válido'}, status=400)
-            if Cliente.objects.filter(email=email).exclude(pk=cliente.pk).exists():
-                return JsonResponse({'success': False, 'error': 'Este email já está cadastrado'}, status=400)
-            cliente.email = email
-            response_value = email
-        elif model_field == 'estado':
-            estado = str(value).strip().upper()
-            if estado and len(estado) > 2:
-                return JsonResponse({'success': False, 'error': 'Estado inválido'}, status=400)
-            cliente.estado = estado or None
-            response_value = cliente.estado or ''
-        elif model_field == 'cidade':
-            cidade = str(value).strip()
-            if len(cidade) > 100:
-                return JsonResponse({'success': False, 'error': 'A cidade é muito longa'}, status=400)
-            cliente.cidade = cidade or None
-            response_value = cliente.cidade or ''
+		if not cliente:
+			return JsonResponse({'success': False, 'error': 'Usuário não autenticado. Faça login novamente.'}, status=401)
 
-        # 4. Salvar
-        try:
-            cliente.save()
-        except IntegrityError:
-            return JsonResponse({'success': False, 'error': 'Este email já está cadastrado'}, status=400)
+		field_map = {
+			'nome_completo': 'nome_completo',
+			'idade': 'idade',
+			'email': 'email',
+			'password': 'password',
+			'cidade': 'cidade',
+			'estado': 'estado',
+		}
 
-        # Mantém a sessão alinhada se o e-mail foi alterado
-        if model_field == 'email':
-            request.session['cliente_email'] = cliente.email
-        
-        print(f"[SUCESSO] Cliente {cliente.id} atualizou {model_field}.")
-        payload = {'success': True, 'message': 'Dados atualizados com sucesso'}
-        if response_value is not None:
-            payload['value'] = response_value
-        return JsonResponse(payload)
-    
-    except json.JSONDecodeError:
-        return JsonResponse({'success': False, 'error': 'JSON inválido'}, status=400)
-    except Exception as e:
-        print(f"[ERRO CRÍTICO] {str(e)}")
-        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+		if field not in field_map:
+			print(f"[ERRO] Tentativa de editar campo não permitido: {field}")
+			return JsonResponse({'success': False, 'error': f'Campo {field} não permitido'}, status=400)
+
+		model_field = field_map[field]
+		response_value = None
+
+		if model_field == 'password':
+			if not value or not str(value).strip():
+				return JsonResponse({'success': False, 'error': 'A senha não pode ser vazia'}, status=400)
+			raw_password = str(value)
+			try:
+				validate_password(raw_password, user=cliente)
+			except ValidationError as e:
+				return JsonResponse({
+					'success': False,
+					'error': '; '.join(e.messages),
+					'errors': list(e.messages)
+				}, status=400)
+			cliente.password = raw_password
+			response_value = None
+		elif model_field == 'nome_completo':
+			nome = str(value).strip()
+			if not nome:
+				return JsonResponse({'success': False, 'error': 'O nome completo não pode ficar vazio'}, status=400)
+			if len(nome) > 255:
+				return JsonResponse({'success': False, 'error': 'O nome completo é muito longo'}, status=400)
+			cliente.nome_completo = nome
+			response_value = nome
+		elif model_field == 'idade':
+			try:
+				idade = int(value)
+			except (TypeError, ValueError):
+				return JsonResponse({'success': False, 'error': 'A idade deve ser um número inteiro válido'}, status=400)
+			if idade < 0:
+				return JsonResponse({'success': False, 'error': 'A idade não pode ser negativa'}, status=400)
+			cliente.idade = idade
+			response_value = idade
+		elif model_field == 'email':
+			email = str(value).lower().strip()
+			try:
+				validate_email(email)
+			except ValidationError:
+				return JsonResponse({'success': False, 'error': 'Informe um e-mail válido'}, status=400)
+			if Cliente.objects.filter(email=email).exclude(pk=cliente.pk).exists():
+				return JsonResponse({'success': False, 'error': 'Este email já está cadastrado'}, status=400)
+			cliente.email = email
+			response_value = email
+		elif model_field == 'estado':
+			estado = str(value).strip().upper()
+			if estado and len(estado) > 2:
+				return JsonResponse({'success': False, 'error': 'Estado inválido'}, status=400)
+			cliente.estado = estado or None
+			response_value = cliente.estado or ''
+		elif model_field == 'cidade':
+			cidade = str(value).strip()
+			if len(cidade) > 100:
+				return JsonResponse({'success': False, 'error': 'A cidade é muito longa'}, status=400)
+			cliente.cidade = cidade or None
+			response_value = cliente.cidade or ''
+
+		try:
+			cliente.save()
+		except IntegrityError:
+			return JsonResponse({'success': False, 'error': 'Este email já está cadastrado'}, status=400)
+
+		if model_field == 'email':
+			request.session['cliente_email'] = cliente.email
+
+		print(f"[SUCESSO] Cliente {cliente.id} atualizou {model_field}.")
+		payload = {'success': True, 'message': 'Dados atualizados com sucesso'}
+		if response_value is not None:
+			payload['value'] = response_value
+		return JsonResponse(payload)
+
+	except json.JSONDecodeError:
+		return JsonResponse({'success': False, 'error': 'JSON inválido'}, status=400)
+	except Exception as e:
+		print(f"[ERRO CRÍTICO] {str(e)}")
+		return JsonResponse({'success': False, 'error': str(e)}, status=500)

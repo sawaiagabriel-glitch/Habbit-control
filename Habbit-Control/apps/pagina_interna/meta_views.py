@@ -20,6 +20,95 @@ from .services import (
 )
 
 
+def _json_erro(erro, status):
+    """Resposta JSON de erro no contrato dos endpoints do assistente."""
+    return JsonResponse({'sucesso': False, 'erro': erro}, status=status)
+
+
+def _ler_corpo_request(request, *, form_as_dict=False):
+    """Lê JSON ou form-data.
+
+    ``assistente_sugerir_meta`` usa ``request.POST`` (QueryDict);
+    ``assistente_criar_meta`` usa ``request.POST.dict()``.
+    """
+    if request.content_type == 'application/json':
+        try:
+            return json.loads(request.body.decode('utf-8')), None
+        except (ValueError, UnicodeDecodeError):
+            return None, _json_erro('Formato JSON inválido.', 400)
+    if form_as_dict:
+        return request.POST.dict(), None
+    return request.POST, None
+
+
+def _cliente_json_autenticado(request):
+    """Cliente da sessão para endpoints JSON, ou resposta 401."""
+    cliente, _ = get_cliente_from_session(request)
+    if cliente is None:
+        return None, _json_erro('Usuário não autenticado.', 401)
+    return cliente, None
+
+
+def _obter_habito_elegivel_para_meta(cliente, habito_id):
+    """Resolve e valida hábito do Cliente para criar/sugerir Meta.
+
+    Preserva as mesmas mensagens e status (400/404) dos endpoints do assistente.
+    """
+    if not habito_id:
+        return None, _json_erro('Selecione um hábito para a meta.', 400)
+
+    try:
+        habito_id_int = int(habito_id)
+    except (TypeError, ValueError):
+        return None, _json_erro('Identificador de hábito inválido.', 400)
+
+    habito = Habito.objects.filter(pk=habito_id_int, cliente=cliente).first()
+    if habito is None:
+        return None, _json_erro(
+            'Hábito não encontrado ou não pertence à sua conta.',
+            404,
+        )
+
+    if habito.tipo_habito != 'positivo':
+        return None, _json_erro(
+            'Apenas hábitos positivos podem receber metas.',
+            400,
+        )
+
+    if habito.metas.exists():
+        return None, _json_erro(
+            'Este hábito já possui uma meta cadastrada.',
+            400,
+        )
+
+    return habito, None
+
+
+def _meta_do_cliente_via_post(request, meta_id, erro_msg):
+    """Fluxo comum POST + Cliente + Meta própria.
+
+    Returns:
+        ``(meta, None)`` em sucesso ou ``(None, HttpResponseRedirect)`` para
+        método inválido, anônimo ou meta inexistente/alheia.
+    """
+    if request.method != 'POST':
+        return None, redirect('metas')
+
+    cliente, _ = get_cliente_from_session(request)
+    if cliente is None:
+        return None, redirect('login')
+
+    meta = Meta.objects.filter(
+        pk=meta_id,
+        habito__cliente=cliente,
+    ).first()
+    if meta is None:
+        messages.error(request, erro_msg)
+        return None, redirect('metas')
+
+    return meta, None
+
+
 def metas(request):
     """Apresenta as metas do Cliente e recebe novas metas por formulário.
 
@@ -94,20 +183,13 @@ def excluir_meta(request, meta_id):
 
     A operação aceita apenas POST e limita a consulta ao Cliente da sessão.
     """
-    if request.method != 'POST':
-        return redirect('metas')
-
-    cliente, _ = get_cliente_from_session(request)
-    if cliente is None:
-        return redirect('login')
-
-    meta = Meta.objects.filter(
-        pk=meta_id,
-        habito__cliente=cliente,
-    ).first()
-    if meta is None:
-        messages.error(request, 'Meta não encontrada ou sem permissão para excluí-la.')
-        return redirect('metas')
+    meta, resposta = _meta_do_cliente_via_post(
+        request,
+        meta_id,
+        'Meta não encontrada ou sem permissão para excluí-la.',
+    )
+    if resposta:
+        return resposta
 
     meta.delete()
     messages.success(request, 'Meta excluída. O hábito e as atividades foram mantidos.')
@@ -119,20 +201,13 @@ def ativar_compartilhamento_meta(request, meta_id):
 
     Operação aceita apenas POST com token CSRF.
     """
-    if request.method != 'POST':
-        return redirect('metas')
-
-    cliente, _ = get_cliente_from_session(request)
-    if cliente is None:
-        return redirect('login')
-
-    meta = Meta.objects.filter(
-        pk=meta_id,
-        habito__cliente=cliente,
-    ).first()
-    if meta is None:
-        messages.error(request, 'Meta não encontrada ou sem permissão para compartilhá-la.')
-        return redirect('metas')
+    meta, resposta = _meta_do_cliente_via_post(
+        request,
+        meta_id,
+        'Meta não encontrada ou sem permissão para compartilhá-la.',
+    )
+    if resposta:
+        return resposta
 
     meta.ativar_compartilhamento()
     messages.success(request, 'Link público de compartilhamento gerado com sucesso.')
@@ -144,23 +219,19 @@ def desativar_compartilhamento_meta(request, meta_id):
 
     O token é mantido persistido para possibilitar reativação futura com o mesmo link.
     """
-    if request.method != 'POST':
-        return redirect('metas')
-
-    cliente, _ = get_cliente_from_session(request)
-    if cliente is None:
-        return redirect('login')
-
-    meta = Meta.objects.filter(
-        pk=meta_id,
-        habito__cliente=cliente,
-    ).first()
-    if meta is None:
-        messages.error(request, 'Meta não encontrada ou sem permissão para desativar o compartilhamento.')
-        return redirect('metas')
+    meta, resposta = _meta_do_cliente_via_post(
+        request,
+        meta_id,
+        'Meta não encontrada ou sem permissão para desativar o compartilhamento.',
+    )
+    if resposta:
+        return resposta
 
     meta.desativar_compartilhamento()
-    messages.success(request, 'Compartilhamento público desativado. O link anterior agora está indisponível.')
+    messages.success(
+        request,
+        'Compartilhamento público desativado. O link anterior agora está indisponível.',
+    )
     return redirect('metas')
 
 
@@ -203,19 +274,15 @@ def assistente_sugerir_meta(request):
     persistidos. A titularidade do hábito vem só da sessão do Cliente.
     """
     if request.method != 'POST':
-        return JsonResponse({'sucesso': False, 'erro': 'Método não permitido.'}, status=405)
+        return _json_erro('Método não permitido.', 405)
 
-    cliente, _ = get_cliente_from_session(request)
-    if cliente is None:
-        return JsonResponse({'sucesso': False, 'erro': 'Usuário não autenticado.'}, status=401)
+    cliente, erro = _cliente_json_autenticado(request)
+    if erro:
+        return erro
 
-    if request.content_type == 'application/json':
-        try:
-            data = json.loads(request.body.decode('utf-8'))
-        except (ValueError, UnicodeDecodeError):
-            return JsonResponse({'sucesso': False, 'erro': 'Formato JSON inválido.'}, status=400)
-    else:
-        data = request.POST
+    data, erro = _ler_corpo_request(request, form_as_dict=False)
+    if erro:
+        return erro
 
     habito_id = data.get('habito_id')
     # Compat: clientes antigos podem enviar objetivo_texto em vez de mensagem.
@@ -225,27 +292,12 @@ def assistente_sugerir_meta(request):
     mensagem = sanitizar_mensagem(mensagem_bruta)
     historico = data.get('historico')
 
-    if not habito_id:
-        return JsonResponse({'sucesso': False, 'erro': 'Selecione um hábito para a meta.'}, status=400)
-
-    try:
-        habito_id_int = int(habito_id)
-    except (TypeError, ValueError):
-        return JsonResponse({'sucesso': False, 'erro': 'Identificador de hábito inválido.'}, status=400)
-
-    # Autorização exclusivamente por sessão + titularidade do hábito.
-    habito = Habito.objects.filter(pk=habito_id_int, cliente=cliente).first()
-    if habito is None:
-        return JsonResponse({'sucesso': False, 'erro': 'Hábito não encontrado ou não pertence à sua conta.'}, status=404)
-
-    if habito.tipo_habito != 'positivo':
-        return JsonResponse({'sucesso': False, 'erro': 'Apenas hábitos positivos podem receber metas.'}, status=400)
-
-    if habito.metas.exists():
-        return JsonResponse({'sucesso': False, 'erro': 'Este hábito já possui uma meta cadastrada.'}, status=400)
+    habito, erro = _obter_habito_elegivel_para_meta(cliente, habito_id)
+    if erro:
+        return erro
 
     if not mensagem:
-        return JsonResponse({'sucesso': False, 'erro': 'Informe uma mensagem para o assistente.'}, status=400)
+        return _json_erro('Informe uma mensagem para o assistente.', 400)
 
     try:
         sugestao = conversar_meta_assistente(
@@ -258,7 +310,7 @@ def assistente_sugerir_meta(request):
             periodo_desejado=habito.frequencia_desejada_periodo,
         )
     except ValueError as e:
-        return JsonResponse({'sucesso': False, 'erro': str(e)}, status=400)
+        return _json_erro(str(e), 400)
 
     resposta = {
         'sucesso': True,
@@ -300,47 +352,19 @@ def assistente_criar_meta(request):
     Não chama OpenAI; apenas revalida o payload e persiste em ``transaction.atomic``.
     """
     if request.method != 'POST':
-        return JsonResponse({'sucesso': False, 'erro': 'Método não permitido.'}, status=405)
+        return _json_erro('Método não permitido.', 405)
 
-    cliente, _ = get_cliente_from_session(request)
-    if cliente is None:
-        return JsonResponse({'sucesso': False, 'erro': 'Usuário não autenticado.'}, status=401)
+    cliente, erro = _cliente_json_autenticado(request)
+    if erro:
+        return erro
 
-    if request.content_type == 'application/json':
-        try:
-            data = json.loads(request.body.decode('utf-8'))
-        except (ValueError, UnicodeDecodeError):
-            return JsonResponse({'sucesso': False, 'erro': 'Formato JSON inválido.'}, status=400)
-    else:
-        data = request.POST.dict()
+    data, erro = _ler_corpo_request(request, form_as_dict=True)
+    if erro:
+        return erro
 
-    habito_id = data.get('habito_id')
-    if not habito_id:
-        return JsonResponse({'sucesso': False, 'erro': 'Selecione um hábito para a meta.'}, status=400)
-
-    try:
-        habito_id_int = int(habito_id)
-    except (TypeError, ValueError):
-        return JsonResponse({'sucesso': False, 'erro': 'Identificador de hábito inválido.'}, status=400)
-
-    habito = Habito.objects.filter(pk=habito_id_int, cliente=cliente).first()
-    if habito is None:
-        return JsonResponse(
-            {'sucesso': False, 'erro': 'Hábito não encontrado ou não pertence à sua conta.'},
-            status=404,
-        )
-
-    if habito.tipo_habito != 'positivo':
-        return JsonResponse(
-            {'sucesso': False, 'erro': 'Apenas hábitos positivos podem receber metas.'},
-            status=400,
-        )
-
-    if habito.metas.exists():
-        return JsonResponse(
-            {'sucesso': False, 'erro': 'Este hábito já possui uma meta cadastrada.'},
-            status=400,
-        )
+    habito, erro = _obter_habito_elegivel_para_meta(cliente, data.get('habito_id'))
+    if erro:
+        return erro
 
     plano_bruto = data.get('plano') if isinstance(data.get('plano'), dict) else {}
     payload_validacao = {
@@ -366,7 +390,7 @@ def assistente_criar_meta(request):
     try:
         normalizado = validar_payload_criacao_meta_assistente(payload_validacao)
     except ValueError as exc:
-        return JsonResponse({'sucesso': False, 'erro': str(exc)}, status=400)
+        return _json_erro(str(exc), 400)
 
     meta = criar_meta_com_plano_assistente(
         habito=habito,
