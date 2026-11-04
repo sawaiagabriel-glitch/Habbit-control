@@ -32,7 +32,8 @@ O sistema deve garantir que:
 - hábitos sejam acessíveis apenas pelo seu proprietário;
 - registros de atividade respeitem a propriedade do hábito;
 - metas sejam acessíveis apenas pelo cliente responsável;
-- futuramente, o Parceiro de Acompanhamento visualize somente metas explicitamente compartilhadas.
+- o Parceiro de Acompanhamento visualize somente metas explicitamente compartilhadas (M2M);
+- o compartilhamento público (quando ativo) exponha apenas progresso da meta, sem dados pessoais.
 
 ---
 

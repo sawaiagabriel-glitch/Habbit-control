@@ -1,90 +1,113 @@
 # Habbit Control — Tarefas do Projeto
 
-##  Documentação
+## Documentação
 
-- [x] Criar spec.md.
-- [x] Criar plan.md.
-- [x] Criar tasks.md.
-- [x] Criar pasta docs.
-- [x] Criar registros ADR.
-- [x] Documentar segurança e SSDLC.
-- [ ] Documentar estratégia de testes.
-- [ ] Criar documentação de revisão em docs/review.
+- [x] Criar `spec.md` consolidado (índice das specs).
+- [x] Criar `plan.md`.
+- [x] Criar/atualizar `task.md`.
+- [x] Criar pasta `docs`.
+- [x] Consolidar registros ADR em `docs/adr/` (ADR-001 a ADR-004).
+- [x] Documentar segurança e SSDLC (`docs/seguranca-ssdlc.md`).
+- [x] Documentar estratégia de testes (`../docs/estrategia-testes.md`).
+- [x] Criar documentação de revisão em `docs/review/revisao-final.md`.
 
+## Cadastro, Login e Perfil
 
-##  Hábitos
+- [x] Cadastro de Cliente com validação, e-mail único e hash PBKDF2.
+- [x] Consentimento LGPD obrigatório e página `/consentimento/`.
+- [x] Login por e-mail/senha com sessão `cliente_email`.
+- [x] Logout e proteção CSRF nos formulários.
+- [x] Perfil `/alterar_dados/` com edição inline e API whitelist.
+- [x] Testes de autenticação, cadastro e perfil (`login_cadastro_app/tests.py`, `pagina_interna/tests.py`).
 
-- [ ] Revisar cadastro de hábitos.
-- [ ] Validar classificação entre hábito positivo e negativo.
-- [ ] Revisar definição de frequência atual e desejada.
-- [ ] Validar regras para edição e exclusão de hábitos.
+## Hábitos
 
-##  Registro de Atividades
+- [x] Cadastro de hábitos (positivo/negativo).
+- [x] Classificação entre hábito positivo e negativo.
+- [x] Frequência atual e desejada com períodos `dia`/`semana`/`mes`/`ano`.
+- [x] Edição e exclusão de hábitos com isolamento por titular.
+- [ ] Parcial: suíte dedicada de testes automatizados só de CRUD de hábitos (cobertura indireta via metas/dashboard/atividade).
 
-- [ ] Revisar o registro diário de atividades.
-- [ ] Validar a regra de um registro por hábito por dia.
-- [ ] Validar os dados informados antes de salvar um registro.
-- [ ] Exibir mensagens adequadas quando um registro for inválido.
+## Registro de Atividades
+
+- [x] Registro diário de atividades (`/atividade_diaria/`, API `/api/registrar_atividade/`).
+- [x] Regra de um registro por hábito por dia (`unique_together`).
+- [x] Validação backend de quantidade (>= 0) e titularidade.
+- [x] Mensagens/erros JSON adequados em casos inválidos.
+- [x] Testes de registro com CSRF e recalculo de meta (`test_meta.py`).
 
 ## Progresso e Relatórios
 
-- [ ] Revisar cálculo de progresso de hábitos positivos.
-- [ ] Revisar cálculo de progresso de hábitos negativos.
-- [ ] Testar os cálculos com diferentes valores.
-- [ ] Revisar apresentação dos relatórios.
-
-##  Testes
-
-- [x] Criar testes de autenticação.
-- [ ] Criar testes de hábitos.
-- [ ] Criar testes de registros de atividades.
-- [ ] Criar testes das regras de progresso.
+- [x] Cálculo de progresso de hábitos positivos.
+- [x] Cálculo de progresso de hábitos negativos.
+- [x] Apresentação em `/progressos/` e `/relatorios/` (Chart.js via API).
+- [x] Dashboard consolidando hábitos, metas e atividades.
+- [ ] Parcial: testes automatizados específicos das fórmulas de relatório de hábitos (além da cobertura de progresso de metas).
 
 ## Metas
 
-
-
-- [ ] Criar model de Meta.
-- [ ] Vincular cada meta a um hábito.
-- [ ] Permitir definir quantidade mínima.
-- [ ] Permitir escolher período: dia, semana, mês ou ano.
-- [ ] Criar meta com estado inicial ativa.
-- [ ] Criar meta com streak inicial igual a 0.
-- [ ] Calcular progresso da meta.
-- [ ] Alterar estado para cumprida quando atingir a quantidade mínima.
-- [ ] Alterar estado para não cumprida quando o período terminar abaixo da meta.
-- [ ] Criar novo ciclo após o encerramento do período.
-- [ ] Testar regras de metas com TDD.
+- [x] Model `Meta` vinculado a hábito positivo (unicidade por hábito).
+- [x] Model `MetaCiclo` com estados `ativa` / `cumprida` / `nao_cumprida`.
+- [x] Quantidade mínima e períodos `dia` / `semana` / `mes` / `ano`.
+- [x] Estado inicial `ativa` e streak inicial `0`.
+- [x] Cálculo de progresso numérico e percentual (cap 100%).
+- [x] Transição para cumprida ao atingir a quantidade mínima (`data_cumprimento`).
+- [x] Fechamento de período não cumprido e abertura de novo ciclo.
+- [x] Comando `atualizar_ciclos_metas` idempotente.
+- [x] Exclusão de meta sem apagar hábito/atividades.
+- [x] Testes TDD em `test_meta.py`.
 
 ## Streak
 
-- [ ] Incrementar streak quando um período for cumprido.
-- [ ] Zerar streak quando um período não for cumprido.
-- [ ] Garantir que o streak só seja atualizado no encerramento do período.
-- [ ] Criar testes para períodos consecutivos cumpridos.
-- [ ] Criar teste para quebra de sequência.
+- [x] Incrementar streak no encerramento de período cumprido.
+- [x] Zerar streak quando o período não for cumprido.
+- [x] Streak atualizado apenas no fechamento do período.
+- [x] Testes de períodos consecutivos e quebra de sequência.
 
 ## Parceiro de Acompanhamento
 
-- [ ] Criar segundo perfil de usuário.
-- [ ] Definir permissões do Parceiro de Acompanhamento.
-- [ ] Impedir que o parceiro edite hábitos do cliente.
-- [ ] Impedir que o parceiro altere dados pessoais do cliente.
-- [ ] Criar testes de autorização para o novo perfil.
+- [x] Model `Parceiro` com cadastro/login em rotas próprias (`parceiro_email`).
+- [x] Permissões: consulta somente leitura de metas partilhadas.
+- [x] Impedir edição de hábitos/dados do Cliente pelo Parceiro.
+- [x] Partilha explícita via M2M `Meta.parceiros`.
+- [x] Testes de autorização e fluxo completo com CSRF (`test_meta.py`).
 
 ## Compartilhamento de Metas
 
-- [ ] Permitir que o cliente compartilhe uma meta com um parceiro.
-- [ ] Registrar o relacionamento entre cliente, parceiro e meta.
-- [ ] Permitir que o parceiro visualize metas compartilhadas.
-- [ ] Impedir acesso a metas não compartilhadas.
-- [ ] Criar testes para compartilhamento e controle de acesso.
+- [x] Compartilhamento com Parceiro na criação/edição da meta.
+- [x] Parceiro visualiza apenas metas associadas à sua conta.
+- [x] Compartilhamento público por token (`compartilhamento_ativo`, `token_publico`).
+- [x] Ativar/desativar link público pelo titular.
+- [x] Página pública somente leitura sem expor dados pessoais.
+- [x] Testes em `test_meta.py` e `test_meta_compartilhamento.py`.
 
-##  Revisão Final
+## Assistente de Metas e Dashboard
 
-- [ ] Verificar se o código corresponde à spec.md.
-- [ ] Verificar se todos os requisitos possuem implementação.
-- [ ] Executar os testes do sistema.
-- [ ] Revisar documentação.
-- [ ] Registrar evidências de funcionamento.
+- [x] Chatbot/assistente híbrido (`meta_assistant.py`) com OpenAI + fallback determinístico.
+- [x] Model `PlanoMetaAssistente` persistido na criação da meta (quando houver plano).
+- [x] API de sugestão não cria Meta; criação explícita em endpoint separado.
+- [x] Chave OpenAI via `.env` / settings (fora do Git).
+- [x] Dashboard com resumo de hábitos, metas manuais e metas do assistente.
+- [x] Testes em `test_meta_assistant.py` e `tests.py` (Dashboard).
 
+## Segurança
+
+- [x] CSRF ativo em formulários e testes HTTP relevantes.
+- [x] Isolamento por usuário (Cliente/Parceiro/meta de terceiros).
+- [x] Validações de backend e whitelist de campos de perfil.
+- [x] Configuração sensível por variáveis de ambiente (`.env`).
+- [x] Documentação SSDLC atualizada.
+
+## Testes
+
+- [x] Testes de autenticação/cadastro.
+- [x] Testes de perfil e Dashboard.
+- [x] Testes de metas, streak, Parceiro e compartilhamento.
+- [x] Testes do assistente (mock OpenAI + fallback).
+- [ ] Parcial: suíte específica isolada para CRUD puro de hábitos e fórmulas de relatório de hábitos.
+
+## Revisão Final
+
+- [x] Verificar aderência das specs ao código implementado.
+- [x] Registrar evidências em `docs/review/revisao-final.md`.
+- [x] Revisar documentação consolidada (`spec.md`, ADRs, `task.md`).
