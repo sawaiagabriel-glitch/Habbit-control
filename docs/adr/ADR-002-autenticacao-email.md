@@ -1,41 +1,47 @@
-# ADR-002 — Uso de e-mail para autenticação
+# ADR-002 — Autenticação por e-mail e sessão
 
-**Status:** Aceito
+## Status
+
+Aceito
 
 ## Contexto
 
-O Habbit Control precisa identificar cada usuário durante o cadastro e o login.
+O Habbit-Control precisa identificar cada usuário no cadastro e no login. Dados pessoais como CPF não são necessários para a finalidade principal do sistema e aumentariam a superfície de dados sensíveis armazenados.
 
-Inicialmente, existiam dados pessoais que poderiam ser utilizados para identificar o usuário, como o CPF. Porém, o CPF não é necessário para a finalidade principal do sistema e aumentaria a quantidade de dados pessoais armazenados.
-
-Foi necessário escolher um identificador mais simples e adequado para autenticação.
+Além do Cliente, o sistema passou a ter o perfil Parceiro de Acompanhamento, que também precisa de autenticação própria sem herdar permissões de escrita do Cliente.
 
 ## Decisão
 
-Foi definido que o sistema utilizará o **e-mail** como principal identificador de autenticação do Cliente.
+- O **e-mail** é o identificador de autenticação do Cliente e do Parceiro.
+- O e-mail é obrigatório, único e normalizado (`lower().strip()`) antes de persistir e autenticar.
+- Senhas são armazenadas com hash PBKDF2 SHA-256 (`make_password` / `check_password`); nunca em texto puro.
+- A autenticação **não** usa o `User` nativo do Django Auth nesta versão: sessões próprias via cookies do Django, com chaves:
+  - `cliente_email` para Cliente;
+  - `parceiro_email` para Parceiro.
+- Rotas de cadastro/login do Parceiro ficam em `partner_views.py`, separadas das do Cliente.
+- Login de um perfil limpa a sessão do outro quando aplicável, evitando ambiguidade de identidade.
+- Áreas privadas exigem sessão válida; formulários e APIs de escrita usam proteção CSRF do Django.
+- Cookies de sessão/CSRF: em desenvolvimento (`DEBUG=True`) aceitam HTTP local (`SameSite=Lax`); em produção (`DEBUG=False`) usam `Secure` e `SameSite=None` (HTTPS).
 
-O e-mail deve:
+## Alternativas consideradas
 
-- ser obrigatório;
-- ser único;
-- ser normalizado antes de ser salvo e utilizado no login.
-
-As senhas devem ser armazenadas utilizando **hash** e nunca em texto puro.
-
-O ID interno do banco de dados continuará sendo utilizado para identificar os registros internamente.
+- Usar CPF como login — rejeitado por minimização de dados e complexidade desnecessária.
+- Migrar imediatamente para `django.contrib.auth.User` / Allauth — possível evolução futura, mas fora do escopo atual; a sessão customizada já atende Cliente e Parceiro.
+- Autenticação social (OAuth) — fora de escopo.
 
 ## Consequências
 
 ### Positivas
 
-- simplifica o processo de login;
-- reduz a coleta de dados pessoais desnecessários;
-- facilita a identificação única do usuário;
-- melhora o alinhamento com princípios de privacidade e minimização de dados;
-- elimina a necessidade de usar CPF como identificador de acesso.
+- login simples e alinhado à LGPD (minimização);
+- credenciais protegidas por hash;
+- isolamento claro entre Cliente e Parceiro;
+- CSRF e cookies configuráveis por ambiente;
+- testes HTTP exercitam autenticação e autorização com CSRF ativo.
 
 ### Negativas
 
-- o sistema precisa impedir o cadastro de e-mails duplicados;
-- alterações de e-mail precisam ser validadas;
-- o usuário depende de um e-mail válido para utilizar sua conta.
+- duplicidade conceitual em relação ao User padrão do Django;
+- e-mail duplicado precisa ser barrado em formulário, view e constraint;
+- alteração de e-mail exige revalidação de unicidade;
+- o usuário depende de um e-mail válido para acessar a conta.

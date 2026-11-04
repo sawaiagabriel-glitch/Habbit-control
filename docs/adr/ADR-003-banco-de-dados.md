@@ -1,45 +1,40 @@
 # ADR-003 — Estratégia de banco de dados
 
-**Status:** Aceito
+## Status
+
+Aceito
 
 ## Contexto
 
-O Habbit Control precisa armazenar de forma persistente informações como:
+O Habbit-Control precisa persistir clientes, parceiros, hábitos, registros de atividade, metas, ciclos de meta, planos do assistente e relacionamentos de compartilhamento.
 
-- clientes;
-- hábitos;
-- registros de atividades;
-- metas;
-- streaks;
-- relacionamentos de acompanhamento.
-
-Também é necessário que o projeto seja fácil de executar durante o desenvolvimento local, sem exigir uma configuração complexa de banco de dados.
-
-Ao mesmo tempo, o sistema deve permitir o uso de outro banco em ambientes externos.
+O ambiente de desenvolvimento deve ser simples de executar pela equipe, sem exigir instalação de servidor de banco. Ao mesmo tempo, o sistema deve permitir evolução para outro SGBD em ambientes externos.
 
 ## Decisão
 
-O ambiente local utilizará **SQLite**, por ser simples de configurar e possuir integração direta com o Django.
+- Desenvolvimento local usa **SQLite** (padrão Django), com arquivo local gerenciado por migrations.
+- Persistência via **Django ORM** e models nas apps `login_cadastro_app` e `pagina_interna`.
+- Evolução de schema exclusivamente por **migrations** do Django.
+- Ambientes externos podem configurar outro banco através de `DATABASE_URL` (quando presente nas settings).
+- Constraints de domínio relevantes ficam no banco/ORM quando possível (ex.: unicidade de e-mail, unicidade de meta por hábito, `unique_together` de atividade por hábito/data).
 
-Em ambientes externos, a configuração do banco poderá ser feita utilizando a variável de ambiente:
+## Alternativas consideradas
 
-`DATABASE_URL`
-
-As alterações na estrutura do banco serão controladas através do sistema de **migrations do Django**.
+- PostgreSQL desde o início em todos os ambientes — melhor para concorrência, porém mais pesado para onboarding local.
+- Persistência apenas em arquivos JSON/CSV — inadequado para relacionamentos, restrições e evolução controlada.
 
 ## Consequências
 
 ### Positivas
 
-- configuração local simples;
-- não exige instalação de um servidor de banco de dados para desenvolvimento;
-- integração direta com o Django;
-- migrations permitem acompanhar alterações na estrutura dos dados;
-- possibilidade de utilizar outro banco em ambiente externo;
-- facilita a execução do projeto por outros integrantes da equipe.
+- setup local rápido;
+- migrations versionadas e auditáveis;
+- integração nativa com o Django e com a suíte de testes;
+- possibilidade de trocar o SGBD sem reescrever a camada de domínio;
+- facilita reprodução do projeto por outros integrantes.
 
 ### Negativas
 
-- SQLite possui limitações para aplicações com muitos acessos simultâneos;
-- podem existir diferenças de comportamento entre SQLite e outros bancos;
-- alterações nos models exigem criação e aplicação correta das migrations.
+- SQLite tem limites de concorrência de escrita;
+- diferenças sutis de comportamento entre SQLite e outros bancos podem aparecer em produção;
+- alterações de model exigem criação e aplicação correta de migrations.

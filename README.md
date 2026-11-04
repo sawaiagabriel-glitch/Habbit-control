@@ -163,11 +163,13 @@ O projeto usa sessões próprias para Cliente e Parceiro, em vez do modelo de ut
 
 ## Documentação
 
+- `spec.md`: índice consolidado das specs.
 - `plan.md`: plano técnico.
 - `task.md`: acompanhamento de tarefas.
 - `specs/`: requisitos de cadastro, perfil, hábitos, privacidade, metas e Parceiro.
-- `docs/adr/ADR-1-django.md`: adoção de Django.
-- `docs/adr/ADR-2-metas-e-parceiro.md`: separação de domínio, vistas e permissões para metas e Parceiro.
+- `docs/adr/ADR-001-django.md` … `ADR-004-metas-streak-parceiro.md`: decisões de arquitetura.
+- `docs/review/revisao-final.md`: revisão final (spec ↔ código ↔ testes).
+- `docs/seguranca-ssdlc.md`: práticas de segurança.
 
 ## Equipa
 
