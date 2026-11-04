@@ -1,8 +1,9 @@
-"""Serviço isolado para sugestão de metas de hábitos.
+"""Serviço isolado para sugestão conversacional de metas de hábitos.
 
 Opera de forma híbrida: tenta a OpenAI Responses API quando configurada e
-disponível; em qualquer falha, usa o algoritmo determinístico local.
-A IA apenas sugere valores — nunca cria nem persiste Metas.
+disponível; em qualquer falha, usa o algoritmo determinístico local (sem
+simular conversa). A IA apenas sugere valores — nunca cria nem persiste Metas.
+O histórico de chat não é persistido; o backend apenas sanitiza o payload.
 """
 
 from __future__ import annotations
@@ -17,14 +18,15 @@ from django.conf import settings
 logger = logging.getLogger(__name__)
 
 LIMITES_SEGURANCA = {
-    'dia': 24,        # Ex: beber água a cada hora acordada
-    'semana': 70,     # Até 10 ocorrências diárias ao longo da semana
-    'mes': 300,       # Até 10 ocorrências diárias no mês
-    'ano': 3650,      # Até 10 ocorrências diárias no ano
+    'dia': 24,
+    'semana': 70,
+    'mes': 300,
+    'ano': 3650,
 }
 
 NIVEIS_VALIDOS = ('confortavel', 'equilibrada', 'desafiadora')
 PERIODOS_VALIDOS = ('dia', 'semana', 'mes', 'ano')
+ROLES_HISTORICO_VALIDOS = ('user', 'assistant')
 
 NOMES_PERIODOS = {
     'dia': 'dia',
@@ -33,27 +35,41 @@ NOMES_PERIODOS = {
     'ano': 'ano',
 }
 
-OBJETIVO_TEXTO_MAX_CHARS = 200
+OBJETIVO_TEXTO_MAX_CHARS = 500
+MENSAGEM_MAX_CHARS = 500
+HISTORICO_MAX_MENSAGENS = 10
+MAX_PERGUNTAS_ACOMPANHAMENTO = 4
 
 SYSTEM_PROMPT = (
-    'Você é um assistente do Habbit-Control especializado em ajudar usuários a '
-    'criar metas de hábitos realistas, progressivas e mensuráveis.\n\n'
-    'Sua função é sugerir uma quantidade e um período com base apenas no hábito, '
-    'frequência atual, objetivo e nível de desafio informado, e também um plano '
-    'estruturado de execução com poucas etapas curtas e objetivas.\n\n'
-    'Regras do plano:\n'
-    '- Crie de 1 a 4 etapas.\n'
-    '- Cada etapa deve ser curta e objetiva.\n'
-    '- O plano deve ser compatível com quantidade_sugerida e periodo.\n'
-    '- Não aumente agressivamente frequência ou volume.\n'
-    '- Priorize consistência antes de intensidade.\n\n'
+    'Você é o assistente conversacional de metas do Habbit-Control.\n\n'
+    'Regra fundamental:\n'
+    'Não crie uma meta imediatamente quando faltarem informações relevantes.\n'
+    'Primeiro compreenda o objetivo do usuário.\n'
+    'Faça uma pergunta por vez.\n'
+    'Pergunte somente o necessário para transformar a intenção em uma meta '
+    'específica, mensurável e realista.\n'
+    'Evite interrogatórios longos.\n'
+    'Normalmente faça entre 1 e 4 perguntas antes de gerar a meta.\n'
+    'Se já houver contexto suficiente, não faça perguntas desnecessárias.\n'
+    'Nunca invente respostas que o usuário não forneceu.\n\n'
+    'Modos de resposta (campo estado):\n'
+    '- coletando_contexto: ainda faltam dados; meta deve ser null; mensagem deve '
+    'conter exatamente uma pergunta de acompanhamento (sem plano parcial).\n'
+    '- meta_pronta: contexto suficiente; preencha meta completa; a justificativa '
+    'deve citar fatos concretos da conversa (números, prazos, disponibilidade).\n\n'
+    'As perguntas devem ser adaptativas ao objetivo. Não use roteiro fixo. '
+    'Decida quais lacunas importam para aquele caso.\n\n'
+    'quantidade_sugerida e periodo devem ser mensuráveis para o formulário de Meta, '
+    'derivados do objetivo e do contexto coletado — nunca um simples +1 na frequência.\n'
+    'Escolha periodo e nivel adequados ao contexto (confortavel, equilibrada ou desafiadora).\n'
+    'Crie de 1 a 4 etapas com inicio_semana e fim_semana coerentes com duracao_semanas.\n'
+    'Priorize consistência antes de intensidade; evite aumentos agressivos.\n'
     'Não faça diagnósticos médicos, psicológicos ou nutricionais.\n'
-    'Não dê conselhos perigosos.\n'
-    'Não sugira valores extremos, impraticáveis ou comportamentos perigosos.\n'
-    'Não invente dados do usuário.\n'
-    'A meta deve ser específica, simples e mensurável.\n'
-    'Você não cria nem salva metas. Apenas gera uma sugestão.\n'
-    'Retorne obrigatoriamente dados estruturados conforme o schema fornecido.'
+    'Não sugira metas perigosas, extremas ou impraticáveis.\n'
+    'Não invente dados pessoais. Não solicite nem utilize documentos de identificação, '
+    'credenciais de acesso ou dados de contato.\n'
+    'Você nunca cria nem salva metas; apenas conversa e sugere.\n'
+    'Retorne obrigatoriamente JSON conforme o schema fornecido.'
 )
 
 PLANO_ETAPA_SCHEMA = {
@@ -61,59 +77,36 @@ PLANO_ETAPA_SCHEMA = {
     'properties': {
         'titulo': {
             'type': 'string',
-            'description': 'Nome curto da etapa (ex.: Adaptação).',
+            'description': 'Nome curto da etapa (ex.: Adaptação, Progressão, Consolidação).',
         },
-        'duracao_semanas': {
+        'inicio_semana': {
             'type': 'integer',
-            'description': 'Duração da etapa em semanas (inteiro >= 1).',
+            'description': 'Semana inicial da etapa (inteiro >= 1).',
+        },
+        'fim_semana': {
+            'type': 'integer',
+            'description': 'Semana final da etapa (inteiro >= inicio_semana).',
         },
         'descricao': {
             'type': 'string',
             'description': 'Orientação objetiva do que fazer nesta etapa.',
         },
     },
-    'required': ['titulo', 'duracao_semanas', 'descricao'],
+    'required': ['titulo', 'inicio_semana', 'fim_semana', 'descricao'],
     'additionalProperties': False,
 }
 
-PLANO_META_SCHEMA = {
+META_PRONTA_SCHEMA = {
     'type': 'object',
     'properties': {
-        'duracao_sugerida_semanas': {
-            'type': 'integer',
-            'description': 'Duração total sugerida do plano em semanas (1 a 52).',
-        },
-        'criterio_sucesso': {
+        'titulo_meta': {
             'type': 'string',
-            'description': 'Critério claro para considerar o plano bem-sucedido.',
+            'description': 'Título curto da meta principal.',
         },
-        'etapas': {
-            'type': 'array',
-            'description': 'De 1 a 4 etapas progressivas e realistas.',
-            'items': PLANO_ETAPA_SCHEMA,
-        },
-        'plano_recuperacao': {
+        'objetivo_principal': {
             'type': 'string',
-            'description': 'Orientação caso o usuário saia do ritmo.',
+            'description': 'Resultado principal que o usuário quer alcançar.',
         },
-        'dica': {
-            'type': 'string',
-            'description': 'Dica prática curta de consistência.',
-        },
-    },
-    'required': [
-        'duracao_sugerida_semanas',
-        'criterio_sucesso',
-        'etapas',
-        'plano_recuperacao',
-        'dica',
-    ],
-    'additionalProperties': False,
-}
-
-SUGESTAO_META_SCHEMA = {
-    'type': 'object',
-    'properties': {
         'quantidade_sugerida': {
             'type': 'integer',
             'description': 'Quantidade mínima sugerida para a meta (inteiro >= 1).',
@@ -122,6 +115,10 @@ SUGESTAO_META_SCHEMA = {
             'type': 'string',
             'enum': list(PERIODOS_VALIDOS),
             'description': 'Período da meta.',
+        },
+        'duracao_semanas': {
+            'type': 'integer',
+            'description': 'Prazo total sugerido do plano em semanas (1 a 52).',
         },
         'nivel': {
             'type': 'string',
@@ -134,28 +131,75 @@ SUGESTAO_META_SCHEMA = {
         },
         'justificativa': {
             'type': 'string',
-            'description': 'Explicação curta da recomendação.',
+            'description': 'Explicação citando fatos concretos da conversa.',
         },
-        'plano': PLANO_META_SCHEMA,
+        'criterio_sucesso': {
+            'type': 'string',
+            'description': 'Critério claro para considerar o plano bem-sucedido.',
+        },
+        'plano_recuperacao': {
+            'type': 'string',
+            'description': 'Orientação caso o usuário saia do ritmo.',
+        },
+        'etapas': {
+            'type': 'array',
+            'description': 'De 1 a 4 etapas progressivas e realistas.',
+            'items': PLANO_ETAPA_SCHEMA,
+        },
     },
     'required': [
+        'titulo_meta',
+        'objetivo_principal',
         'quantidade_sugerida',
         'periodo',
+        'duracao_semanas',
         'nivel',
         'mensagem',
         'justificativa',
-        'plano',
+        'criterio_sucesso',
+        'plano_recuperacao',
+        'etapas',
     ],
     'additionalProperties': False,
 }
 
-# Limites usados apenas na validação defensiva do plano (não persistidos).
+# Compat: nome antigo usado por testes/imports que referenciam o schema da meta.
+SUGESTAO_META_SCHEMA = META_PRONTA_SCHEMA
+
+RESPOSTA_CONVERSA_SCHEMA = {
+    'type': 'object',
+    'properties': {
+        'estado': {
+            'type': 'string',
+            'enum': ['coletando_contexto', 'meta_pronta'],
+            'description': 'Modo da resposta do assistente.',
+        },
+        'mensagem': {
+            'type': 'string',
+            'description': (
+                'Pergunta de acompanhamento (coletando_contexto) ou resumo amigável '
+                '(meta_pronta).'
+            ),
+        },
+        'meta': {
+            'anyOf': [
+                {'type': 'null'},
+                META_PRONTA_SCHEMA,
+            ],
+            'description': 'Meta completa quando estado=meta_pronta; null caso contrário.',
+        },
+    },
+    'required': ['estado', 'mensagem', 'meta'],
+    'additionalProperties': False,
+}
+
 PLANO_DURACAO_TOTAL_MIN = 1
 PLANO_DURACAO_TOTAL_MAX = 52
-PLANO_ETAPA_DURACAO_MAX = 26
 PLANO_ETAPAS_MIN = 1
 PLANO_ETAPAS_MAX = 4
 PLANO_TEXTO_MAX_CHARS = 400
+TITULO_META_MAX_CHARS = 160
+OBJETIVO_PRINCIPAL_MAX_CHARS = 300
 
 
 class MetaAssistantIAError(Exception):
@@ -163,10 +207,7 @@ class MetaAssistantIAError(Exception):
 
 
 def sanitizar_objetivo_texto(texto: str | None, max_chars: int = OBJETIVO_TEXTO_MAX_CHARS) -> str:
-    """Limita e sanitiza o texto livre opcional do usuário.
-
-    Não persiste nada; apenas prepara contexto seguro para a IA.
-    """
+    """Limita e sanitiza texto livre. Não persiste nada."""
     if texto is None:
         return ''
     limpo = str(texto).strip()
@@ -175,6 +216,46 @@ def sanitizar_objetivo_texto(texto: str | None, max_chars: int = OBJETIVO_TEXTO_
     if len(limpo) > max_chars:
         limpo = limpo[:max_chars].rstrip()
     return limpo
+
+
+def sanitizar_mensagem(texto: str | None, max_chars: int = MENSAGEM_MAX_CHARS) -> str:
+    """Sanitiza a mensagem atual do usuário no chat."""
+    return sanitizar_objetivo_texto(texto, max_chars=max_chars)
+
+
+def sanitizar_historico(historico: Any) -> list[dict[str, str]]:
+    """Valida e limita o histórico enviado pelo frontend.
+
+    - Aceita no máximo HISTORICO_MAX_MENSAGENS mensagens.
+    - role deve ser user|assistant.
+    - content limitado a MENSAGEM_MAX_CHARS e sanitizado.
+    - Campos extras são ignorados.
+    - Não usa o histórico para autenticação ou titularidade.
+    """
+    if historico is None:
+        return []
+    if not isinstance(historico, list):
+        return []
+
+    limpo: list[dict[str, str]] = []
+    for item in historico:
+        if len(limpo) >= HISTORICO_MAX_MENSAGENS:
+            break
+        if not isinstance(item, dict):
+            continue
+        role = str(item.get('role', '')).strip().lower()
+        if role not in ROLES_HISTORICO_VALIDOS:
+            continue
+        content = sanitizar_mensagem(item.get('content'))
+        if not content:
+            continue
+        limpo.append({'role': role, 'content': content})
+    return limpo
+
+
+def contar_perguntas_assistente(historico: list[dict[str, str]]) -> int:
+    """Conta turnos do assistente já presentes no histórico sanitizado."""
+    return sum(1 for msg in historico if msg.get('role') == 'assistant')
 
 
 def _normalizar_entrada(frequencia_atual: int, nivel: str, periodo: str) -> tuple[int, str, str]:
@@ -216,40 +297,22 @@ def _openai_timeout() -> float:
 
 
 def sugerir_meta_deterministica(frequencia_atual: int, nivel: str, periodo: str) -> dict:
-    """Calcula deterministamente uma quantidade mínima recomendada para uma meta.
-
-    Args:
-        frequencia_atual: Frequência com que o hábito é praticado atualmente.
-        nivel: Grau de desafio ('confortavel', 'equilibrada', 'desafiadora').
-        periodo: Intervalo da meta ('dia', 'semana', 'mes', 'ano').
-
-    Returns:
-        Dicionário com a quantidade sugerida, período, nível e mensagem explicativa.
-
-    Raises:
-        ValueError: Se a frequência atual for menor que 1, se o período ou o nível
-            forem inválidos.
-    """
+    """Calcula deterministamente uma quantidade mínima recomendada para uma meta."""
     frequencia_atual, nivel_normalizado, periodo_normalizado = _normalizar_entrada(
         frequencia_atual, nivel, periodo,
     )
 
-    # Cálculo progressivo baseado no nível
     if nivel_normalizado == 'confortavel':
-        # Foco em consistência: ritmo atual ou reforço suave
         quantidade = max(1, int(round(frequencia_atual * 1.15)) if frequencia_atual >= 2 else 2)
         descricao_nivel = 'confortável, ideal para consolidar consistência sem sobrecarga'
     elif nivel_normalizado == 'equilibrada':
-        # Evolução moderada e sustentável (+30% a +50%)
         quantidade = max(frequencia_atual + 1, int(round(frequencia_atual * 1.5)))
         descricao_nivel = 'equilibrada, trazendo avanço sustentável para a sua rotina'
-    else:  # desafiadora
-        # Alta performance (+70% a +100%)
+    else:
         quantidade = max(frequencia_atual + 2, int(round(frequencia_atual * 2.0)))
         descricao_nivel = 'desafiadora, focada em maximizar sua evolução e novos patamares'
 
     quantidade_final = _aplicar_limite_seguranca(quantidade, periodo_normalizado)
-
     nome_periodo = NOMES_PERIODOS.get(periodo_normalizado, periodo_normalizado)
     mensagem = (
         f'Minha sugestão é de {quantidade_final} vez(es) por {nome_periodo}. '
@@ -269,17 +332,36 @@ def sugerir_meta_deterministica(frequencia_atual: int, nivel: str, periodo: str)
     }
 
 
-def _validar_plano(plano_bruto: Any) -> dict | None:
-    """Valida e normaliza o plano estruturado.
+def _empacotar_fallback_deterministico(
+    frequencia_atual: int,
+    nivel: str = 'equilibrada',
+    periodo: str = 'semana',
+) -> dict:
+    """Converte a sugestão determinística no contrato conversacional meta_pronta."""
+    det = sugerir_meta_deterministica(frequencia_atual, nivel, periodo)
+    meta = {
+        'quantidade_sugerida': det['quantidade_sugerida'],
+        'periodo': det['periodo'],
+        'nivel': det['nivel'],
+        'mensagem': det['mensagem'],
+        'justificativa': det['justificativa'],
+    }
+    return {
+        'estado': 'meta_pronta',
+        'mensagem': det['mensagem'],
+        'meta': meta,
+        'origem': 'deterministico',
+        # Campos flat para compatibilidade com consumidores antigos / "Usar esta meta".
+        **meta,
+    }
 
-    Retorna o plano normalizado ou ``None`` se inválido (falha soft: a sugestão
-    principal da meta permanece válida). Não exige igualdade estrita entre a
-    soma das durações das etapas e ``duracao_sugerida_semanas``.
-    """
+
+def _validar_plano(plano_bruto: Any) -> dict | None:
+    """Valida e normaliza o plano flat. Retorna None se inválido (soft-fail)."""
     if not isinstance(plano_bruto, dict):
         return None
 
-    duracao_total = plano_bruto.get('duracao_sugerida_semanas')
+    duracao_total = plano_bruto.get('duracao_semanas')
     if isinstance(duracao_total, bool) or not isinstance(duracao_total, int):
         return None
     if duracao_total < PLANO_DURACAO_TOTAL_MIN or duracao_total > PLANO_DURACAO_TOTAL_MAX:
@@ -292,59 +374,51 @@ def _validar_plano(plano_bruto: Any) -> dict | None:
         return None
 
     etapas_normalizadas: list[dict] = []
-    soma_duracoes = 0
     for etapa in etapas_brutas:
         if not isinstance(etapa, dict):
             return None
         titulo = etapa.get('titulo')
         descricao = etapa.get('descricao')
-        duracao = etapa.get('duracao_semanas')
+        inicio = etapa.get('inicio_semana')
+        fim = etapa.get('fim_semana')
         if not isinstance(titulo, str) or not titulo.strip():
             return None
         if not isinstance(descricao, str) or not descricao.strip():
             return None
-        if isinstance(duracao, bool) or not isinstance(duracao, int):
+        if isinstance(inicio, bool) or not isinstance(inicio, int):
             return None
-        if duracao < 1 or duracao > PLANO_ETAPA_DURACAO_MAX:
+        if isinstance(fim, bool) or not isinstance(fim, int):
             return None
-        soma_duracoes += duracao
+        if inicio < 1 or fim < inicio:
+            return None
+        if fim > duracao_total:
+            return None
         etapas_normalizadas.append({
             'titulo': titulo.strip()[:120],
-            'duracao_semanas': duracao,
+            'inicio_semana': inicio,
+            'fim_semana': fim,
             'descricao': descricao.strip()[:PLANO_TEXTO_MAX_CHARS],
         })
 
-    # Coerência: soma positiva e dentro do teto; pequena diferença vs. total é ok.
-    if soma_duracoes < PLANO_DURACAO_TOTAL_MIN or soma_duracoes > PLANO_DURACAO_TOTAL_MAX:
-        return None
-
     criterio = plano_bruto.get('criterio_sucesso')
     recuperacao = plano_bruto.get('plano_recuperacao')
-    dica = plano_bruto.get('dica')
     if not isinstance(criterio, str) or not criterio.strip():
         return None
     if not isinstance(recuperacao, str) or not recuperacao.strip():
         return None
-    if not isinstance(dica, str) or not dica.strip():
-        return None
 
     return {
-        'duracao_sugerida_semanas': duracao_total,
+        'duracao_semanas': duracao_total,
         'criterio_sucesso': criterio.strip()[:PLANO_TEXTO_MAX_CHARS],
         'etapas': etapas_normalizadas,
         'plano_recuperacao': recuperacao.strip()[:PLANO_TEXTO_MAX_CHARS],
-        'dica': dica.strip()[:PLANO_TEXTO_MAX_CHARS],
     }
 
 
-def _validar_resposta_ia(dados: dict[str, Any], periodo_solicitado: str, nivel_solicitado: str) -> dict:
-    """Valida e normaliza a saída da IA. Levanta MetaAssistantIAError se inválida.
-
-    O plano estruturado é opcional na prática: se vier inválido, a sugestão
-    principal é preservada e o plano é omitido.
-    """
+def _validar_meta_pronta(dados: dict[str, Any]) -> dict:
+    """Valida a meta quando estado=meta_pronta. Soft-fail do plano."""
     if not isinstance(dados, dict):
-        raise MetaAssistantIAError('Resposta da IA não é um objeto.')
+        raise MetaAssistantIAError('meta inválida.')
 
     quantidade = dados.get('quantidade_sugerida')
     if isinstance(quantidade, bool) or not isinstance(quantidade, int):
@@ -355,80 +429,152 @@ def _validar_resposta_ia(dados: dict[str, Any], periodo_solicitado: str, nivel_s
     periodo = str(dados.get('periodo', '')).strip().lower()
     if periodo not in PERIODOS_VALIDOS:
         raise MetaAssistantIAError('periodo inválido na resposta da IA.')
-    # O período da sugestão deve respeitar o escolhido pelo usuário
-    if periodo != periodo_solicitado:
-        raise MetaAssistantIAError('periodo divergente do solicitado.')
 
     nivel = str(dados.get('nivel', '')).strip().lower()
     if nivel not in NIVEIS_VALIDOS:
         raise MetaAssistantIAError('nivel inválido na resposta da IA.')
-    if nivel != nivel_solicitado:
-        raise MetaAssistantIAError('nivel divergente do solicitado.')
 
     limite = LIMITES_SEGURANCA.get(periodo, 100)
     if quantidade > limite:
         raise MetaAssistantIAError('quantidade acima do limite de segurança.')
 
+    titulo_meta = dados.get('titulo_meta')
+    objetivo_principal = dados.get('objetivo_principal')
     mensagem = dados.get('mensagem')
     justificativa = dados.get('justificativa')
+    if not isinstance(titulo_meta, str) or not titulo_meta.strip():
+        raise MetaAssistantIAError('titulo_meta inválido.')
+    if not isinstance(objetivo_principal, str) or not objetivo_principal.strip():
+        raise MetaAssistantIAError('objetivo_principal inválido.')
     if not isinstance(mensagem, str) or not mensagem.strip():
         raise MetaAssistantIAError('mensagem inválida.')
     if not isinstance(justificativa, str) or not justificativa.strip():
         raise MetaAssistantIAError('justificativa inválida.')
 
     resultado = {
+        'titulo_meta': titulo_meta.strip()[:TITULO_META_MAX_CHARS],
+        'objetivo_principal': objetivo_principal.strip()[:OBJETIVO_PRINCIPAL_MAX_CHARS],
         'quantidade_sugerida': quantidade,
         'periodo': periodo,
         'nivel': nivel,
         'mensagem': mensagem.strip()[:500],
         'justificativa': justificativa.strip()[:500],
-        'origem': 'ia',
     }
 
-    plano_normalizado = _validar_plano(dados.get('plano'))
+    plano_normalizado = _validar_plano({
+        'duracao_semanas': dados.get('duracao_semanas'),
+        'criterio_sucesso': dados.get('criterio_sucesso'),
+        'plano_recuperacao': dados.get('plano_recuperacao'),
+        'etapas': dados.get('etapas'),
+    })
     if plano_normalizado is not None:
-        resultado['plano'] = plano_normalizado
-    elif 'plano' in dados:
+        resultado.update(plano_normalizado)
+    else:
         logger.info(
-            'Assistente de metas: plano estruturado inválido; '
+            'Assistente de metas: plano/etapas inválidos; '
             'mantendo apenas a sugestão principal.'
         )
 
     return resultado
 
 
-def _montar_contexto_ia(
+def _validar_resposta_conversa(
+    dados: dict[str, Any],
     *,
+    perguntas_ja_feitas: int,
+) -> dict:
+    """Valida a resposta discriminada da IA."""
+    if not isinstance(dados, dict):
+        raise MetaAssistantIAError('Resposta da IA não é um objeto.')
+
+    estado = str(dados.get('estado', '')).strip().lower()
+    if estado not in ('coletando_contexto', 'meta_pronta'):
+        raise MetaAssistantIAError('estado inválido.')
+
+    mensagem = dados.get('mensagem')
+    if not isinstance(mensagem, str) or not mensagem.strip():
+        raise MetaAssistantIAError('mensagem inválida.')
+    mensagem_limpa = mensagem.strip()[:MENSAGEM_MAX_CHARS]
+
+    meta_bruta = dados.get('meta')
+
+    if estado == 'coletando_contexto':
+        if meta_bruta is not None:
+            raise MetaAssistantIAError('meta deve ser null em coletando_contexto.')
+        if perguntas_ja_feitas >= MAX_PERGUNTAS_ACOMPANHAMENTO:
+            raise MetaAssistantIAError(
+                'Limite de perguntas de acompanhamento atingido sem meta_pronta.'
+            )
+        return {
+            'estado': 'coletando_contexto',
+            'mensagem': mensagem_limpa,
+            'meta': None,
+            'origem': 'ia',
+        }
+
+    # meta_pronta
+    if meta_bruta is None:
+        raise MetaAssistantIAError('meta obrigatória em meta_pronta.')
+    meta_normalizada = _validar_meta_pronta(meta_bruta)
+    return {
+        'estado': 'meta_pronta',
+        'mensagem': mensagem_limpa,
+        'meta': meta_normalizada,
+        'origem': 'ia',
+        **meta_normalizada,
+    }
+
+
+# Compatibilidade com testes que ainda importam o validador antigo.
+def _validar_resposta_ia(dados: dict[str, Any], periodo_solicitado: str = '', nivel_solicitado: str = '') -> dict:
+    """Compat: valida meta flat ou envelope conversacional."""
+    if isinstance(dados, dict) and 'estado' in dados:
+        return _validar_resposta_conversa(dados, perguntas_ja_feitas=0)
+    meta = _validar_meta_pronta(dados)
+    if periodo_solicitado and meta['periodo'] != periodo_solicitado:
+        raise MetaAssistantIAError('periodo divergente do solicitado.')
+    if nivel_solicitado and meta['nivel'] != nivel_solicitado:
+        raise MetaAssistantIAError('nivel divergente do solicitado.')
+    return {'origem': 'ia', **meta}
+
+
+def _montar_instrucoes_contexto(
+    *,
+    nome_habito: str,
     frequencia_atual: int,
-    nivel: str,
-    periodo: str,
-    nome_habito: str = '',
-    frequencia_desejada: int | None = None,
-    periodo_desejado: str | None = None,
-    objetivo_texto: str = '',
+    periodo_habito: str,
+    frequencia_desejada: int | None,
+    periodo_desejado: str | None,
+    perguntas_ja_feitas: int,
 ) -> str:
     partes = [
-        f'Hábito: {nome_habito or "não informado"}',
-        f'Frequência atual: {frequencia_atual} vez(es) por {periodo}',
-        f'Nível desejado: {nivel}',
-        f'Período da meta: {periodo}',
-        f'Limite máximo seguro para este período: {LIMITES_SEGURANCA.get(periodo, 100)}',
+        SYSTEM_PROMPT,
+        '',
+        'Contexto do hábito (apenas referência; não substitui a conversa):',
+        f'- Hábito: {nome_habito or "não informado"}',
+        f'- Frequência registrada: {frequencia_atual} vez(es) por {periodo_habito}',
+        f'- Limite máximo seguro por período: dia={LIMITES_SEGURANCA["dia"]}, '
+        f'semana={LIMITES_SEGURANCA["semana"]}, mes={LIMITES_SEGURANCA["mes"]}, '
+        f'ano={LIMITES_SEGURANCA["ano"]}',
     ]
     if frequencia_desejada is not None and isinstance(frequencia_desejada, int) and frequencia_desejada >= 1:
-        periodo_ref = periodo_desejado if periodo_desejado in PERIODOS_VALIDOS else periodo
-        partes.append(f'Frequência desejada informada no hábito: {frequencia_desejada} vez(es) por {periodo_ref}')
-    if objetivo_texto:
-        partes.append(f'Objetivo descrito pelo usuário: {objetivo_texto}')
-    partes.append(
-        'Sugira quantidade_sugerida (>= 1), mantendo o mesmo periodo e nivel informados, '
-        'respeitando o limite de segurança.'
-    )
-    partes.append(
-        'Inclua também um plano estruturado com 1 a 4 etapas curtas, duração total em '
-        'semanas, critério de sucesso, plano de recuperação e uma dica prática. '
-        'O plano deve ser compatível com a quantidade e o período sugeridos, sem '
-        'aumentos agressivos.'
-    )
+        periodo_ref = periodo_desejado if periodo_desejado in PERIODOS_VALIDOS else periodo_habito
+        partes.append(
+            f'- Frequência desejada no cadastro: {frequencia_desejada} vez(es) por {periodo_ref}'
+        )
+    partes.append(f'- Perguntas de acompanhamento já feitas nesta conversa: {perguntas_ja_feitas}')
+    if perguntas_ja_feitas >= MAX_PERGUNTAS_ACOMPANHAMENTO:
+        partes.append(
+            f'- OBRIGATÓRIO: já houve {perguntas_ja_feitas} perguntas. '
+            'Responda com estado=meta_pronta agora (exceto se houver razão clara de '
+            'segurança para recusar a meta). Não faça nova pergunta.'
+        )
+    else:
+        restantes = MAX_PERGUNTAS_ACOMPANHAMENTO - perguntas_ja_feitas
+        partes.append(
+            f'- Você pode fazer no máximo mais {restantes} pergunta(s) antes de '
+            'precisar concluir com meta_pronta.'
+        )
     return '\n'.join(partes)
 
 
@@ -441,7 +587,6 @@ def _extrair_json_resposta(response: Any) -> dict:
         except (TypeError, json.JSONDecodeError) as exc:
             raise MetaAssistantIAError('JSON inválido em output_text.') from exc
 
-    # Fallback defensivo: percorrer itens de saída
     output = getattr(response, 'output', None) or []
     for item in output:
         contents = getattr(item, 'content', None) or []
@@ -455,6 +600,136 @@ def _extrair_json_resposta(response: Any) -> dict:
     raise MetaAssistantIAError('Resposta da IA sem conteúdo estruturado.')
 
 
+def conversar_meta_assistente(
+    *,
+    mensagem: str,
+    historico: Any = None,
+    nome_habito: str = '',
+    frequencia_atual: int = 1,
+    periodo_habito: str = 'semana',
+    frequencia_desejada: int | None = None,
+    periodo_desejado: str | None = None,
+    nivel_fallback: str = 'equilibrada',
+) -> dict:
+    """Conduz um turno do assistente conversacional.
+
+    Returns:
+        Dict com estado, mensagem, meta (ou None), origem e campos flat quando meta_pronta.
+    """
+    mensagem_limpa = sanitizar_mensagem(mensagem)
+    if not mensagem_limpa:
+        raise ValueError('Informe uma mensagem para o assistente.')
+
+    historico_limpo = sanitizar_historico(historico)
+    perguntas_ja_feitas = contar_perguntas_assistente(historico_limpo)
+
+    # Normaliza contexto do hábito para fallback / prompt (não autoriza usuário).
+    try:
+        freq_int = int(frequencia_atual)
+    except (TypeError, ValueError):
+        freq_int = 1
+    if freq_int < 1:
+        freq_int = 1
+    periodo_ctx = str(periodo_habito or 'semana').strip().lower()
+    if periodo_ctx not in PERIODOS_VALIDOS:
+        periodo_ctx = 'semana'
+    nivel_fb = str(nivel_fallback or 'equilibrada').strip().lower()
+    if nivel_fb not in NIVEIS_VALIDOS:
+        nivel_fb = 'equilibrada'
+
+    if not _openai_api_key():
+        return _empacotar_fallback_deterministico(freq_int, nivel_fb, periodo_ctx)
+
+    try:
+        return _conversar_com_ia(
+            mensagem=mensagem_limpa,
+            historico=historico_limpo,
+            perguntas_ja_feitas=perguntas_ja_feitas,
+            nome_habito=(nome_habito or '').strip()[:120],
+            frequencia_atual=freq_int,
+            periodo_habito=periodo_ctx,
+            frequencia_desejada=frequencia_desejada,
+            periodo_desejado=periodo_desejado,
+        )
+    except MetaAssistantIAError:
+        logger.info('Assistente de metas: usando fallback determinístico.')
+        return _empacotar_fallback_deterministico(freq_int, nivel_fb, periodo_ctx)
+    except Exception:
+        logger.warning(
+            'Assistente de metas: exceção inesperada; usando fallback determinístico.',
+            exc_info=False,
+        )
+        return _empacotar_fallback_deterministico(freq_int, nivel_fb, periodo_ctx)
+
+
+def _conversar_com_ia(
+    *,
+    mensagem: str,
+    historico: list[dict[str, str]],
+    perguntas_ja_feitas: int,
+    nome_habito: str,
+    frequencia_atual: int,
+    periodo_habito: str,
+    frequencia_desejada: int | None,
+    periodo_desejado: str | None,
+) -> dict:
+    api_key = _openai_api_key()
+    if not api_key:
+        raise MetaAssistantIAError('OPENAI_API_KEY ausente.')
+
+    try:
+        from openai import OpenAI
+    except ImportError as exc:
+        raise MetaAssistantIAError('SDK openai não instalado.') from exc
+
+    instructions = _montar_instrucoes_contexto(
+        nome_habito=nome_habito,
+        frequencia_atual=frequencia_atual,
+        periodo_habito=periodo_habito,
+        frequencia_desejada=frequencia_desejada,
+        periodo_desejado=periodo_desejado,
+        perguntas_ja_feitas=perguntas_ja_feitas,
+    )
+
+    input_messages: list[dict[str, str]] = [
+        {'role': msg['role'], 'content': msg['content']}
+        for msg in historico
+    ]
+    input_messages.append({'role': 'user', 'content': mensagem})
+
+    try:
+        client = OpenAI(api_key=api_key, timeout=_openai_timeout())
+        response = client.responses.create(
+            model=_openai_model(),
+            instructions=instructions,
+            input=input_messages,
+            store=False,
+            text={
+                'format': {
+                    'type': 'json_schema',
+                    'name': 'resposta_assistente_meta',
+                    'strict': True,
+                    'schema': RESPOSTA_CONVERSA_SCHEMA,
+                }
+            },
+        )
+        dados_brutos = _extrair_json_resposta(response)
+        return _validar_resposta_conversa(
+            dados_brutos,
+            perguntas_ja_feitas=perguntas_ja_feitas,
+        )
+    except MetaAssistantIAError:
+        raise
+    except ValueError:
+        raise
+    except Exception as exc:
+        logger.warning(
+            'Falha na OpenAI Responses API no assistente de metas: %s',
+            type(exc).__name__,
+        )
+        raise MetaAssistantIAError(f'Erro na API OpenAI: {type(exc).__name__}') from exc
+
+
 def sugerir_meta_com_ia(
     frequencia_atual: int,
     nivel: str,
@@ -464,66 +739,31 @@ def sugerir_meta_com_ia(
     frequencia_desejada: int | None = None,
     periodo_desejado: str | None = None,
     objetivo_texto: str = '',
+    mensagem: str = '',
+    historico: Any = None,
 ) -> dict:
-    """Gera sugestão via OpenAI Responses API com Structured Outputs.
+    """Gera turno via IA. Compatível com assinatura antiga (objetivo_texto).
 
-    Raises:
-        ValueError: Entrada inválida (mesmas regras do algoritmo determinístico).
-        MetaAssistantIAError: Qualquer falha de integração ou validação da saída.
+    Raises MetaAssistantIAError em falhas (sem fallback automático).
     """
     frequencia_atual, nivel_normalizado, periodo_normalizado = _normalizar_entrada(
         frequencia_atual, nivel, periodo,
     )
+    texto = sanitizar_mensagem(mensagem or objetivo_texto)
+    if not texto:
+        texto = 'Quero melhorar este hábito.'
 
-    api_key = _openai_api_key()
-    if not api_key:
-        raise MetaAssistantIAError('OPENAI_API_KEY ausente.')
-
-    objetivo_limpo = sanitizar_objetivo_texto(objetivo_texto)
-    contexto = _montar_contexto_ia(
-        frequencia_atual=frequencia_atual,
-        nivel=nivel_normalizado,
-        periodo=periodo_normalizado,
+    historico_limpo = sanitizar_historico(historico)
+    return _conversar_com_ia(
+        mensagem=texto,
+        historico=historico_limpo,
+        perguntas_ja_feitas=contar_perguntas_assistente(historico_limpo),
         nome_habito=(nome_habito or '').strip()[:120],
+        frequencia_atual=frequencia_atual,
+        periodo_habito=periodo_normalizado,
         frequencia_desejada=frequencia_desejada,
         periodo_desejado=periodo_desejado,
-        objetivo_texto=objetivo_limpo,
     )
-
-    try:
-        from openai import OpenAI
-    except ImportError as exc:
-        raise MetaAssistantIAError('SDK openai não instalado.') from exc
-
-    try:
-        client = OpenAI(api_key=api_key, timeout=_openai_timeout())
-        response = client.responses.create(
-            model=_openai_model(),
-            instructions=SYSTEM_PROMPT,
-            input=contexto,
-            store=False,
-            text={
-                'format': {
-                    'type': 'json_schema',
-                    'name': 'sugestao_meta',
-                    'strict': True,
-                    'schema': SUGESTAO_META_SCHEMA,
-                }
-            },
-        )
-        dados_brutos = _extrair_json_resposta(response)
-        return _validar_resposta_ia(dados_brutos, periodo_normalizado, nivel_normalizado)
-    except MetaAssistantIAError:
-        raise
-    except ValueError:
-        raise
-    except Exception as exc:
-        # Não vaza detalhes técnicos ao chamador; loga de forma segura
-        logger.warning(
-            'Falha na OpenAI Responses API no assistente de metas: %s',
-            type(exc).__name__,
-        )
-        raise MetaAssistantIAError(f'Erro na API OpenAI: {type(exc).__name__}') from exc
 
 
 def sugerir_meta(
@@ -535,34 +775,24 @@ def sugerir_meta(
     frequencia_desejada: int | None = None,
     periodo_desejado: str | None = None,
     objetivo_texto: str = '',
+    mensagem: str = '',
+    historico: Any = None,
 ) -> dict:
-    """Sugere uma meta: tenta IA quando disponível; senão usa algoritmo determinístico.
+    """Sugere meta/conversa: tenta IA; senão fallback determinístico.
 
-    A assinatura posicional (frequencia_atual, nivel, periodo) permanece compatível
-    com o código e os testes existentes.
+    Mantém assinatura posicional compatível. Com IA, retorna o contrato
+    conversacional (estado/mensagem/meta). Sem IA ou em falha, retorna
+    fallback empacotado como meta_pronta.
     """
-    # Valida entrada cedo (ValueError propaga para o endpoint como 400)
     _normalizar_entrada(frequencia_atual, nivel, periodo)
 
-    if not _openai_api_key():
-        return sugerir_meta_deterministica(frequencia_atual, nivel, periodo)
-
-    try:
-        return sugerir_meta_com_ia(
-            frequencia_atual,
-            nivel,
-            periodo,
-            nome_habito=nome_habito,
-            frequencia_desejada=frequencia_desejada,
-            periodo_desejado=periodo_desejado,
-            objetivo_texto=objetivo_texto,
-        )
-    except MetaAssistantIAError:
-        logger.info('Assistente de metas: usando fallback determinístico.')
-        return sugerir_meta_deterministica(frequencia_atual, nivel, periodo)
-    except Exception:
-        logger.warning(
-            'Assistente de metas: exceção inesperada; usando fallback determinístico.',
-            exc_info=False,
-        )
-        return sugerir_meta_deterministica(frequencia_atual, nivel, periodo)
+    return conversar_meta_assistente(
+        mensagem=mensagem or objetivo_texto or 'Quero melhorar este hábito.',
+        historico=historico,
+        nome_habito=nome_habito,
+        frequencia_atual=frequencia_atual,
+        periodo_habito=periodo,
+        frequencia_desejada=frequencia_desejada,
+        periodo_desejado=periodo_desejado,
+        nivel_fallback=nivel,
+    )

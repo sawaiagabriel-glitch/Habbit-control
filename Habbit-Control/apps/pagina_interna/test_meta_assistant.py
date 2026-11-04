@@ -8,10 +8,17 @@ from django.urls import reverse
 
 from apps.login_cadastro_app.models import Cliente, Parceiro
 from apps.pagina_interna.meta_assistant import (
+    HISTORICO_MAX_MENSAGENS,
     LIMITES_SEGURANCA,
+    MAX_PERGUNTAS_ACOMPANHAMENTO,
+    MENSAGEM_MAX_CHARS,
     MetaAssistantIAError,
     OBJETIVO_TEXTO_MAX_CHARS,
     _validar_plano,
+    contar_perguntas_assistente,
+    conversar_meta_assistente,
+    sanitizar_historico,
+    sanitizar_mensagem,
     sanitizar_objetivo_texto,
     sugerir_meta,
     sugerir_meta_com_ia,
@@ -70,7 +77,8 @@ class MetaAssistantUnitTest(TestCase):
         obtido = sugerir_meta(frequencia_atual=2, nivel='equilibrada', periodo='semana')
         self.assertEqual(obtido['quantidade_sugerida'], esperado['quantidade_sugerida'])
         self.assertEqual(obtido['origem'], 'deterministico')
-        self.assertNotIn('plano', obtido)
+        self.assertEqual(obtido['estado'], 'meta_pronta')
+        self.assertNotIn('etapas', obtido.get('meta') or {})
 
     def test_fallback_deterministico_nao_exige_plano(self):
         res = sugerir_meta_deterministica(frequencia_atual=2, nivel='confortavel', periodo='semana')
@@ -82,30 +90,64 @@ class MetaAssistantUnitTest(TestCase):
 
 def _plano_valido(**overrides):
     base = {
-        'duracao_sugerida_semanas': 6,
+        'duracao_semanas': 8,
         'criterio_sucesso': 'Cumprir pelo menos 80% das sessões planejadas.',
         'etapas': [
             {
                 'titulo': 'Adaptação',
-                'duracao_semanas': 2,
-                'descricao': 'Mantenha 2 sessões obrigatórias e uma terceira opcional.',
+                'inicio_semana': 1,
+                'fim_semana': 2,
+                'descricao': 'Realizar 2 treinos leves e 1 treino mais longo por semana.',
+            },
+            {
+                'titulo': 'Progressão',
+                'inicio_semana': 3,
+                'fim_semana': 5,
+                'descricao': 'Manter 3 treinos semanais e aumentar gradualmente a distância.',
             },
             {
                 'titulo': 'Consolidação',
-                'duracao_semanas': 2,
-                'descricao': 'Realize 3 sessões por semana.',
-            },
-            {
-                'titulo': 'Manutenção',
-                'duracao_semanas': 2,
-                'descricao': 'Mantenha 3 sessões por semana com consistência.',
+                'inicio_semana': 6,
+                'fim_semana': 8,
+                'descricao': 'Aproximar progressivamente o treino longo do objetivo.',
             },
         ],
-        'plano_recuperacao': 'Se não cumprir uma semana, retome a etapa anterior.',
-        'dica': 'Priorize consistência antes de aumentar quantidade.',
+        'plano_recuperacao': 'Se não cumprir uma semana, repita a última etapa antes de avançar.',
     }
     base.update(overrides)
     return base
+
+
+def _meta_pronta_valida(**overrides):
+    base = {
+        'titulo_meta': 'Correr 10 km continuamente',
+        'objetivo_principal': 'Completar uma corrida contínua de 10 km',
+        'quantidade_sugerida': 3,
+        'periodo': 'semana',
+        'nivel': 'equilibrada',
+        'mensagem': 'Vamos construir sua capacidade para correr 10 km progressivamente.',
+        'justificativa': 'Você já corre 4 km e treina 3 vezes por semana.',
+    }
+    base.update(_plano_valido())
+    base.update(overrides)
+    return base
+
+
+def _resposta_coletando(mensagem='Qual é a maior distância que você corre hoje?'):
+    return {
+        'estado': 'coletando_contexto',
+        'mensagem': mensagem,
+        'meta': None,
+    }
+
+
+def _resposta_meta_pronta(**overrides):
+    meta = _meta_pronta_valida(**overrides)
+    return {
+        'estado': 'meta_pronta',
+        'mensagem': meta['mensagem'],
+        'meta': meta,
+    }
 
 
 def _resposta_ia_mock(payload: dict) -> MagicMock:
@@ -116,14 +158,13 @@ def _resposta_ia_mock(payload: dict) -> MagicMock:
 
 
 class MetaAssistantPlanoValidacaoTest(TestCase):
-    """Validação isolada do plano estruturado (falha soft)."""
+    """Validação isolada do plano flat (falha soft)."""
 
     def test_plano_valido_e_aceito(self):
         plano = _validar_plano(_plano_valido())
         self.assertIsNotNone(plano)
-        self.assertEqual(plano['duracao_sugerida_semanas'], 6)
+        self.assertEqual(plano['duracao_semanas'], 8)
         self.assertEqual(len(plano['etapas']), 3)
-        self.assertIn('criterio_sucesso', plano)
 
     def test_plano_aceita_entre_1_e_4_etapas(self):
         for n in (1, 2, 3, 4):
@@ -131,117 +172,256 @@ class MetaAssistantPlanoValidacaoTest(TestCase):
                 etapas = [
                     {
                         'titulo': f'Etapa {i}',
-                        'duracao_semanas': 1,
+                        'inicio_semana': i,
+                        'fim_semana': i,
                         'descricao': f'Descrição {i}',
                     }
                     for i in range(1, n + 1)
                 ]
-                plano = _validar_plano(_plano_valido(
-                    duracao_sugerida_semanas=n,
-                    etapas=etapas,
-                ))
+                plano = _validar_plano(_plano_valido(duracao_semanas=n, etapas=etapas))
                 self.assertIsNotNone(plano)
                 self.assertEqual(len(plano['etapas']), n)
 
     def test_plano_rejeita_zero_ou_mais_de_quatro_etapas(self):
         self.assertIsNone(_validar_plano(_plano_valido(etapas=[])))
         etapas_cinco = [
-            {'titulo': f'E{i}', 'duracao_semanas': 1, 'descricao': f'D{i}'}
-            for i in range(5)
+            {
+                'titulo': f'E{i}',
+                'inicio_semana': i,
+                'fim_semana': i,
+                'descricao': f'D{i}',
+            }
+            for i in range(1, 6)
         ]
-        self.assertIsNone(_validar_plano(_plano_valido(
-            duracao_sugerida_semanas=5,
-            etapas=etapas_cinco,
-        )))
+        self.assertIsNone(_validar_plano(_plano_valido(duracao_semanas=5, etapas=etapas_cinco)))
 
-    def test_pequena_diferenca_entre_soma_e_duracao_total_nao_invalida(self):
-        # Soma das etapas = 5; duração sugerida = 6 — diferença pequena ok.
+    def test_prazo_valido_aceito_com_etapas_nao_contiguas(self):
         plano = _validar_plano(_plano_valido(
-            duracao_sugerida_semanas=6,
+            duracao_semanas=8,
             etapas=[
-                {'titulo': 'A', 'duracao_semanas': 2, 'descricao': 'Primeira'},
-                {'titulo': 'B', 'duracao_semanas': 3, 'descricao': 'Segunda'},
+                {'titulo': 'A', 'inicio_semana': 1, 'fim_semana': 2, 'descricao': 'Primeira'},
+                {'titulo': 'B', 'inicio_semana': 5, 'fim_semana': 7, 'descricao': 'Segunda'},
             ],
         ))
         self.assertIsNotNone(plano)
-        self.assertEqual(plano['duracao_sugerida_semanas'], 6)
-        self.assertEqual(sum(e['duracao_semanas'] for e in plano['etapas']), 5)
 
     def test_etapa_invalida_rejeita_apenas_o_plano(self):
         self.assertIsNone(_validar_plano(_plano_valido(
-            etapas=[{'titulo': '', 'duracao_semanas': 2, 'descricao': 'x'}],
-        )))
-        self.assertIsNone(_validar_plano(_plano_valido(
-            etapas=[{'titulo': 'A', 'duracao_semanas': 0, 'descricao': 'x'}],
+            etapas=[{'titulo': '', 'inicio_semana': 1, 'fim_semana': 2, 'descricao': 'x'}],
         )))
         self.assertIsNone(_validar_plano(None))
-        self.assertIsNone(_validar_plano('nao-e-objeto'))
+
+
+class MetaAssistantHistoricoTest(TestCase):
+    """Sanitização e limites do histórico/mensagem."""
+
+    def test_mensagem_limitada_e_sanitizada(self):
+        longo = 'a' * (MENSAGEM_MAX_CHARS + 50)
+        self.assertEqual(len(sanitizar_mensagem(longo)), MENSAGEM_MAX_CHARS)
+        self.assertEqual(sanitizar_mensagem('  Olá\x00 mundo\n\n  '), 'Olá mundo')
+        self.assertEqual(sanitizar_objetivo_texto('x' * (OBJETIVO_TEXTO_MAX_CHARS + 10)), 'x' * OBJETIVO_TEXTO_MAX_CHARS)
+
+    def test_historico_e_limitado_e_sanitizado(self):
+        bruto = [
+            {'role': 'user', 'content': 'Quero correr', 'extra': 'ignorar'},
+            {'role': 'system', 'content': 'não deve passar'},
+            {'role': 'assistant', 'content': 'Qual distância?'},
+            'nao-e-objeto',
+            {'role': 'user', 'content': ''},
+            {'role': 'USER', 'content': '  4 km  '},
+        ]
+        limpo = sanitizar_historico(bruto)
+        self.assertEqual(len(limpo), 3)
+        self.assertEqual(limpo[0], {'role': 'user', 'content': 'Quero correr'})
+        self.assertEqual(limpo[1]['role'], 'assistant')
+        self.assertEqual(limpo[2], {'role': 'user', 'content': '4 km'})
+        self.assertNotIn('extra', limpo[0])
+
+    def test_historico_respeita_maximo_de_mensagens(self):
+        bruto = [
+            {'role': 'user' if i % 2 == 0 else 'assistant', 'content': f'msg {i}'}
+            for i in range(HISTORICO_MAX_MENSAGENS + 5)
+        ]
+        limpo = sanitizar_historico(bruto)
+        self.assertEqual(len(limpo), HISTORICO_MAX_MENSAGENS)
+
+    def test_contar_perguntas_assistente(self):
+        historico = [
+            {'role': 'user', 'content': 'Quero correr 10 km'},
+            {'role': 'assistant', 'content': 'Qual distância atual?'},
+            {'role': 'user', 'content': '4 km'},
+            {'role': 'assistant', 'content': 'Quantas vezes por semana?'},
+        ]
+        self.assertEqual(contar_perguntas_assistente(historico), 2)
 
 
 @override_settings(OPENAI_API_KEY='sk-test-fake-key-not-real', OPENAI_META_ASSISTANT_MODEL='gpt-test-model')
 class MetaAssistantIATest(TestCase):
-    """Testa integração híbrida com a OpenAI via mocks (sem chamadas reais)."""
-
-    def _payload_valido(self, **overrides):
-        base = {
-            'quantidade_sugerida': 3,
-            'periodo': 'semana',
-            'nivel': 'equilibrada',
-            'mensagem': 'Uma meta de 3 vezes por semana é um avanço gradual.',
-            'justificativa': 'Aumento moderado em relação às 2 vezes atuais.',
-        }
-        base.update(overrides)
-        return base
-
-    def _payload_com_plano(self, **overrides):
-        base = self._payload_valido(plano=_plano_valido())
-        base.update(overrides)
-        return base
+    """Integração híbrida conversacional com mocks."""
 
     @patch('openai.OpenAI')
-    def test_ia_resposta_valida_e_utilizada(self, mock_openai_cls):
+    def test_objetivo_insuficiente_retorna_coletando_contexto(self, mock_openai_cls):
         client = MagicMock()
         mock_openai_cls.return_value = client
-        client.responses.create.return_value = _resposta_ia_mock(self._payload_valido())
+        client.responses.create.return_value = _resposta_ia_mock(_resposta_coletando())
 
-        res = sugerir_meta(
+        res = conversar_meta_assistente(
+            mensagem='Quero correr 10 km',
+            historico=[],
+            nome_habito='Corrida',
+            frequencia_atual=2,
+            periodo_habito='semana',
+        )
+        self.assertEqual(res['estado'], 'coletando_contexto')
+        self.assertIsNone(res['meta'])
+        self.assertIn('distância', res['mensagem'].lower())
+        self.assertEqual(res['origem'], 'ia')
+
+    @patch('openai.OpenAI')
+    def test_ia_faz_pergunta_de_acompanhamento(self, mock_openai_cls):
+        client = MagicMock()
+        mock_openai_cls.return_value = client
+        pergunta = 'Quantas vezes por semana você consegue treinar?'
+        client.responses.create.return_value = _resposta_ia_mock(_resposta_coletando(pergunta))
+
+        res = sugerir_meta_com_ia(
             frequencia_atual=2,
             nivel='equilibrada',
             periodo='semana',
-            nome_habito='Corrida',
-            objetivo_texto='Quero voltar a correr sem exagerar.',
+            mensagem='Quero correr 10 km',
         )
-        self.assertEqual(res['origem'], 'ia')
+        self.assertEqual(res['estado'], 'coletando_contexto')
+        self.assertEqual(res['mensagem'], pergunta)
+        self.assertIsNone(res['meta'])
+
+    @patch('openai.OpenAI')
+    def test_historico_e_enviado_a_openai(self, mock_openai_cls):
+        client = MagicMock()
+        mock_openai_cls.return_value = client
+        client.responses.create.return_value = _resposta_ia_mock(_resposta_coletando('Ok, e o prazo?'))
+
+        historico = [
+            {'role': 'user', 'content': 'Quero correr 10 km'},
+            {'role': 'assistant', 'content': 'Qual distância atual?'},
+        ]
+        conversar_meta_assistente(
+            mensagem='4 km',
+            historico=historico,
+            nome_habito='Corrida',
+        )
+        kwargs = client.responses.create.call_args.kwargs
+        input_enviado = kwargs.get('input')
+        self.assertIsInstance(input_enviado, list)
+        self.assertEqual(input_enviado[0]['content'], 'Quero correr 10 km')
+        self.assertEqual(input_enviado[1]['role'], 'assistant')
+        self.assertEqual(input_enviado[-1], {'role': 'user', 'content': '4 km'})
+        self.assertEqual(kwargs.get('store'), False)
+        schema = kwargs['text']['format']['schema']
+        self.assertIn('estado', schema['properties'])
+        self.assertIn('coletando_contexto', schema['properties']['estado']['enum'])
+
+    @patch('openai.OpenAI')
+    def test_ia_pode_fazer_mais_de_uma_pergunta(self, mock_openai_cls):
+        client = MagicMock()
+        mock_openai_cls.return_value = client
+        client.responses.create.return_value = _resposta_ia_mock(
+            _resposta_coletando('Você tem prazo específico?')
+        )
+        historico = [
+            {'role': 'user', 'content': 'Quero correr 10 km'},
+            {'role': 'assistant', 'content': 'Qual distância atual?'},
+            {'role': 'user', 'content': '4 km'},
+            {'role': 'assistant', 'content': 'Quantas vezes por semana?'},
+        ]
+        res = conversar_meta_assistente(mensagem='3 vezes', historico=historico)
+        self.assertEqual(res['estado'], 'coletando_contexto')
+        self.assertIn('prazo', res['mensagem'].lower())
+
+    @patch('openai.OpenAI')
+    def test_contexto_suficiente_retorna_meta_pronta(self, mock_openai_cls):
+        client = MagicMock()
+        mock_openai_cls.return_value = client
+        client.responses.create.return_value = _resposta_ia_mock(_resposta_meta_pronta())
+
+        historico = [
+            {'role': 'user', 'content': 'Quero correr 10 km'},
+            {'role': 'assistant', 'content': 'Qual distância atual?'},
+            {'role': 'user', 'content': '4 km'},
+            {'role': 'assistant', 'content': 'Quantas vezes por semana?'},
+            {'role': 'user', 'content': '3'},
+            {'role': 'assistant', 'content': 'Tem prazo?'},
+        ]
+        res = conversar_meta_assistente(mensagem='Em dois meses', historico=historico)
+        self.assertEqual(res['estado'], 'meta_pronta')
+        self.assertIsNotNone(res['meta'])
+        self.assertEqual(res['meta']['quantidade_sugerida'], 3)
         self.assertEqual(res['quantidade_sugerida'], 3)
-        self.assertEqual(res['periodo'], 'semana')
-        self.assertIn('gradual', res['mensagem'])
-        client.responses.create.assert_called_once()
+        self.assertEqual(len(res['etapas']), 3)
+
+    @patch('openai.OpenAI')
+    def test_resposta_final_usa_schema_completo(self, mock_openai_cls):
+        client = MagicMock()
+        mock_openai_cls.return_value = client
+        client.responses.create.return_value = _resposta_ia_mock(_resposta_meta_pronta())
+        res = conversar_meta_assistente(mensagem='Quero correr 10 km em 8 semanas com 3 treinos')
+        meta = res['meta']
+        for campo in (
+            'titulo_meta', 'objetivo_principal', 'quantidade_sugerida', 'periodo',
+            'duracao_semanas', 'nivel', 'mensagem', 'justificativa',
+            'criterio_sucesso', 'plano_recuperacao', 'etapas',
+        ):
+            self.assertIn(campo, meta)
+
+    @patch('openai.OpenAI')
+    def test_plano_invalido_soft_fail_preserva_meta_principal(self, mock_openai_cls):
+        client = MagicMock()
+        mock_openai_cls.return_value = client
+        payload = _resposta_meta_pronta(etapas=[])
+        client.responses.create.return_value = _resposta_ia_mock(payload)
+        res = conversar_meta_assistente(mensagem='Quero correr 10 km')
+        self.assertEqual(res['estado'], 'meta_pronta')
+        self.assertEqual(res['titulo_meta'], 'Correr 10 km continuamente')
+        self.assertNotIn('etapas', res['meta'])
+
+    @patch('openai.OpenAI')
+    def test_meta_principal_invalida_aciona_fallback(self, mock_openai_cls):
+        client = MagicMock()
+        mock_openai_cls.return_value = client
+        payload = _resposta_meta_pronta(quantidade_sugerida=0)
+        client.responses.create.return_value = _resposta_ia_mock(payload)
+        res = conversar_meta_assistente(
+            mensagem='Quero correr',
+            frequencia_atual=2,
+            periodo_habito='semana',
+            nivel_fallback='equilibrada',
+        )
+        self.assertEqual(res['origem'], 'deterministico')
+        self.assertEqual(res['estado'], 'meta_pronta')
 
     @override_settings(OPENAI_API_KEY='')
     @patch('openai.OpenAI')
     def test_chave_ausente_aciona_fallback(self, mock_openai_cls):
-        res = sugerir_meta(frequencia_atual=2, nivel='equilibrada', periodo='semana')
+        res = conversar_meta_assistente(mensagem='Quero correr 10 km', frequencia_atual=2)
         self.assertEqual(res['origem'], 'deterministico')
+        self.assertEqual(res['estado'], 'meta_pronta')
         mock_openai_cls.assert_not_called()
 
     @patch('openai.OpenAI')
     def test_timeout_aciona_fallback(self, mock_openai_cls):
         from openai import APITimeoutError
-
         client = MagicMock()
         mock_openai_cls.return_value = client
         client.responses.create.side_effect = APITimeoutError(
             request=httpx.Request('POST', 'https://api.openai.com/v1/responses'),
         )
-
-        res = sugerir_meta(frequencia_atual=2, nivel='equilibrada', periodo='semana')
+        res = conversar_meta_assistente(mensagem='Quero correr', frequencia_atual=2)
         self.assertEqual(res['origem'], 'deterministico')
+        self.assertEqual(res['estado'], 'meta_pronta')
         self.assertGreaterEqual(res['quantidade_sugerida'], 3)
 
     @patch('openai.OpenAI')
     def test_erro_autenticacao_aciona_fallback(self, mock_openai_cls):
         from openai import AuthenticationError
-
         client = MagicMock()
         mock_openai_cls.return_value = client
         client.responses.create.side_effect = AuthenticationError(
@@ -252,8 +432,7 @@ class MetaAssistantIATest(TestCase):
             ),
             body=None,
         )
-
-        res = sugerir_meta(frequencia_atual=2, nivel='equilibrada', periodo='semana')
+        res = conversar_meta_assistente(mensagem='Quero ler mais', frequencia_atual=2)
         self.assertEqual(res['origem'], 'deterministico')
 
     @patch('openai.OpenAI')
@@ -261,8 +440,7 @@ class MetaAssistantIATest(TestCase):
         client = MagicMock()
         mock_openai_cls.return_value = client
         client.responses.create.side_effect = RuntimeError('falha inesperada')
-
-        res = sugerir_meta(frequencia_atual=2, nivel='desafiadora', periodo='semana')
+        res = conversar_meta_assistente(mensagem='Quero estudar', frequencia_atual=2)
         self.assertEqual(res['origem'], 'deterministico')
 
     @patch('openai.OpenAI')
@@ -273,154 +451,80 @@ class MetaAssistantIATest(TestCase):
         broken.output_text = 'isto não é json'
         broken.output = []
         client.responses.create.return_value = broken
-
-        res = sugerir_meta(frequencia_atual=2, nivel='equilibrada', periodo='semana')
-        self.assertEqual(res['origem'], 'deterministico')
-
-    @patch('openai.OpenAI')
-    def test_quantidade_zero_ou_negativa_rejeitada(self, mock_openai_cls):
-        client = MagicMock()
-        mock_openai_cls.return_value = client
-
-        for qtd in (0, -3):
-            with self.subTest(qtd=qtd):
-                client.responses.create.return_value = _resposta_ia_mock(
-                    self._payload_valido(quantidade_sugerida=qtd)
-                )
-                res = sugerir_meta(frequencia_atual=2, nivel='equilibrada', periodo='semana')
-                self.assertEqual(res['origem'], 'deterministico')
-
-    @patch('openai.OpenAI')
-    def test_periodo_invalido_rejeitado(self, mock_openai_cls):
-        client = MagicMock()
-        mock_openai_cls.return_value = client
-        client.responses.create.return_value = _resposta_ia_mock(
-            self._payload_valido(periodo='seculo')
-        )
-        res = sugerir_meta(frequencia_atual=2, nivel='equilibrada', periodo='semana')
+        res = conversar_meta_assistente(mensagem='Quero correr', frequencia_atual=2)
         self.assertEqual(res['origem'], 'deterministico')
 
     @patch('openai.OpenAI')
     def test_quantidade_acima_do_limite_rejeitada(self, mock_openai_cls):
         client = MagicMock()
         mock_openai_cls.return_value = client
-        client.responses.create.return_value = _resposta_ia_mock(
-            self._payload_valido(
-                quantidade_sugerida=LIMITES_SEGURANCA['semana'] + 10,
-                periodo='semana',
-            )
-        )
-        res = sugerir_meta(frequencia_atual=2, nivel='equilibrada', periodo='semana')
+        client.responses.create.return_value = _resposta_ia_mock(_resposta_meta_pronta(
+            quantidade_sugerida=LIMITES_SEGURANCA['semana'] + 10,
+        ))
+        res = conversar_meta_assistente(mensagem='Quero exagerar', frequencia_atual=2)
         self.assertEqual(res['origem'], 'deterministico')
         self.assertLessEqual(res['quantidade_sugerida'], LIMITES_SEGURANCA['semana'])
+
+    @patch('openai.OpenAI')
+    def test_limite_de_perguntas_forca_meta_pronta_ou_fallback(self, mock_openai_cls):
+        client = MagicMock()
+        mock_openai_cls.return_value = client
+        # IA tenta perguntar além do limite → validação falha → fallback
+        client.responses.create.return_value = _resposta_ia_mock(_resposta_coletando('Mais uma?'))
+        historico = []
+        for i in range(MAX_PERGUNTAS_ACOMPANHAMENTO):
+            historico.append({'role': 'user', 'content': f'resposta {i}'})
+            historico.append({'role': 'assistant', 'content': f'pergunta {i}'})
+        res = conversar_meta_assistente(mensagem='ok', historico=historico, frequencia_atual=2)
+        self.assertEqual(res['estado'], 'meta_pronta')
+        self.assertEqual(res['origem'], 'deterministico')
 
     @patch('openai.OpenAI')
     def test_dados_pessoais_nao_sao_enviados_a_openai(self, mock_openai_cls):
         client = MagicMock()
         mock_openai_cls.return_value = client
-        client.responses.create.return_value = _resposta_ia_mock(self._payload_valido())
-
-        sugerir_meta_com_ia(
-            frequencia_atual=2,
-            nivel='equilibrada',
-            periodo='semana',
+        client.responses.create.return_value = _resposta_ia_mock(_resposta_coletando())
+        conversar_meta_assistente(
+            mensagem='Quero correr mais.',
             nome_habito='Corrida',
-            objetivo_texto='Quero correr mais.',
         )
         kwargs = client.responses.create.call_args.kwargs
-        input_enviado = kwargs.get('input', '')
-        instructions = kwargs.get('instructions', '')
-        blob = f'{input_enviado}\n{instructions}'.lower()
-
+        blob = f"{kwargs.get('input')}\n{kwargs.get('instructions')}".lower()
         for vazado in (
-            'cpf',
-            'senha',
-            'password',
-            'email',
-            'assistente@teste.com',
-            'endereço',
-            'endereco',
-            'sk-test-fake-key',
+            'cpf', 'senha', 'password', 'email', 'assistente@teste.com',
+            'endereço', 'endereco', 'sk-test-fake-key',
         ):
             self.assertNotIn(vazado, blob)
-
-        self.assertIn('corrida', input_enviado.lower())
-        self.assertEqual(kwargs.get('store'), False)
-
-    def test_objetivo_texto_limitado_e_sanitizado(self):
-        longo = 'a' * (OBJETIVO_TEXTO_MAX_CHARS + 50)
-        limpo = sanitizar_objetivo_texto(longo)
-        self.assertEqual(len(limpo), OBJETIVO_TEXTO_MAX_CHARS)
-
-        sujo = '  Quero\tler\x00 mais\n\n  '
-        self.assertEqual(sanitizar_objetivo_texto(sujo), 'Quero ler mais')
-        self.assertEqual(sanitizar_objetivo_texto(None), '')
-        self.assertEqual(sanitizar_objetivo_texto(''), '')
 
     @patch('openai.OpenAI')
     def test_sugerir_meta_com_ia_levanta_quando_schema_invalido(self, mock_openai_cls):
         client = MagicMock()
         mock_openai_cls.return_value = client
-        client.responses.create.return_value = _resposta_ia_mock(
-            self._payload_valido(quantidade_sugerida=0)
-        )
+        client.responses.create.return_value = _resposta_ia_mock(_resposta_meta_pronta(
+            quantidade_sugerida=0,
+        ))
         with self.assertRaises(MetaAssistantIAError):
-            sugerir_meta_com_ia(frequencia_atual=2, nivel='equilibrada', periodo='semana')
+            sugerir_meta_com_ia(
+                frequencia_atual=2,
+                nivel='equilibrada',
+                periodo='semana',
+                mensagem='Quero correr',
+            )
 
     @patch('openai.OpenAI')
-    def test_ia_retorna_plano_valido(self, mock_openai_cls):
+    def test_meta_pronta_nao_cria_meta(self, mock_openai_cls):
         client = MagicMock()
         mock_openai_cls.return_value = client
-        client.responses.create.return_value = _resposta_ia_mock(self._payload_com_plano())
-
-        res = sugerir_meta(
-            frequencia_atual=2,
-            nivel='equilibrada',
-            periodo='semana',
-            nome_habito='Corrida',
-        )
-        self.assertEqual(res['origem'], 'ia')
-        self.assertEqual(res['quantidade_sugerida'], 3)
-        self.assertIn('plano', res)
-        self.assertEqual(res['plano']['duracao_sugerida_semanas'], 6)
-        self.assertEqual(len(res['plano']['etapas']), 3)
-        self.assertTrue(1 <= len(res['plano']['etapas']) <= 4)
-
-    @patch('openai.OpenAI')
-    def test_plano_com_etapas_invalidas_nao_quebra_sugestao_principal(self, mock_openai_cls):
-        client = MagicMock()
-        mock_openai_cls.return_value = client
-        client.responses.create.return_value = _resposta_ia_mock(
-            self._payload_com_plano(plano=_plano_valido(etapas=[]))
-        )
-
-        res = sugerir_meta(
-            frequencia_atual=2,
-            nivel='equilibrada',
-            periodo='semana',
-        )
-        self.assertEqual(res['origem'], 'ia')
-        self.assertEqual(res['quantidade_sugerida'], 3)
-        self.assertEqual(res['periodo'], 'semana')
-        self.assertIn('mensagem', res)
-        self.assertNotIn('plano', res)
-
-    @patch('openai.OpenAI')
-    def test_campos_obrigatorios_da_meta_continuam_validados(self, mock_openai_cls):
-        client = MagicMock()
-        mock_openai_cls.return_value = client
-        # Plano válido não salva a sugestão se quantidade for inválida.
-        client.responses.create.return_value = _resposta_ia_mock(
-            self._payload_com_plano(quantidade_sugerida=0)
-        )
-        res = sugerir_meta(frequencia_atual=2, nivel='equilibrada', periodo='semana')
-        self.assertEqual(res['origem'], 'deterministico')
-        self.assertNotIn('plano', res)
+        client.responses.create.return_value = _resposta_ia_mock(_resposta_meta_pronta())
+        metas_antes = Meta.objects.count()
+        res = conversar_meta_assistente(mensagem='Quero correr 10 km')
+        self.assertEqual(res['estado'], 'meta_pronta')
+        self.assertEqual(Meta.objects.count(), metas_antes)
 
 
 @override_settings(OPENAI_API_KEY='')
 class MetaAssistantEndpointTest(TestCase):
-    """Testa o endpoint POST /metas/assistente/sugerir/ e suas validações de segurança."""
+    """Endpoint conversacional: autenticação, titularidade e fallback."""
 
     def setUp(self):
         self.cliente = Cliente.objects.create(
@@ -476,7 +580,6 @@ class MetaAssistantEndpointTest(TestCase):
             data_inicio=date.today(),
         )
         self.meta_existente.parceiros.add(self.parceiro)
-
         self.habito_alheio = Habito.objects.create(
             cliente=self.outro_cliente,
             tipo_habito='positivo',
@@ -487,132 +590,85 @@ class MetaAssistantEndpointTest(TestCase):
             frequencia_desejada_periodo='semana',
         )
 
+    def _post_assistente(self, payload, client=None):
+        c = client or self.client
+        return c.post(
+            reverse('assistente_sugerir_meta'),
+            data=json.dumps(payload),
+            content_type='application/json',
+        )
+
     def test_cliente_autenticado_recebe_sugestao_com_sucesso(self):
         self.client.post(reverse('login'), {
             'email': self.cliente.email,
             'password': 'senha123',
         })
-        payload = {
+        res = self._post_assistente({
             'habito_id': self.habito_positivo.id,
-            'frequencia_atual': 2,
-            'periodo': 'semana',
-            'nivel': 'equilibrada',
-        }
-        res = self.client.post(
-            reverse('assistente_sugerir_meta'),
-            data=json.dumps(payload),
-            content_type='application/json',
-        )
+            'mensagem': 'Quero treinar com mais constância.',
+            'historico': [],
+        })
         self.assertEqual(res.status_code, 200)
         data = res.json()
         self.assertTrue(data['sucesso'])
         self.assertEqual(data['habito_id'], self.habito_positivo.id)
-        self.assertEqual(data['nome_habito'], 'Academia')
+        self.assertEqual(data['estado'], 'meta_pronta')
+        self.assertEqual(data.get('origem'), 'deterministico')
         self.assertGreaterEqual(data['quantidade_sugerida'], 3)
         self.assertEqual(data['periodo'], 'semana')
-        self.assertIn('mensagem', data)
-        self.assertEqual(data.get('origem'), 'deterministico')
 
     def test_usuario_anonimo_rejeitado_com_401(self):
-        anonimo = Client()
-        payload = {
+        res = self._post_assistente({
             'habito_id': self.habito_positivo.id,
-            'frequencia_atual': 2,
-            'periodo': 'semana',
-            'nivel': 'equilibrada',
-        }
-        res = anonimo.post(
-            reverse('assistente_sugerir_meta'),
-            data=json.dumps(payload),
-            content_type='application/json',
-        )
+            'mensagem': 'Quero correr',
+        }, client=Client())
         self.assertEqual(res.status_code, 401)
-        data = res.json()
-        self.assertFalse(data['sucesso'])
 
     def test_habito_de_outro_usuario_rejeitado(self):
         self.client.post(reverse('login'), {
             'email': self.cliente.email,
             'password': 'senha123',
         })
-        payload = {
+        res = self._post_assistente({
             'habito_id': self.habito_alheio.id,
-            'frequencia_atual': 2,
-            'periodo': 'semana',
-            'nivel': 'equilibrada',
-        }
-        res = self.client.post(
-            reverse('assistente_sugerir_meta'),
-            data=json.dumps(payload),
-            content_type='application/json',
-        )
+            'mensagem': 'Quero nadar mais',
+        })
         self.assertEqual(res.status_code, 404)
-        data = res.json()
-        self.assertFalse(data['sucesso'])
 
     def test_habito_negativo_rejeitado(self):
         self.client.post(reverse('login'), {
             'email': self.cliente.email,
             'password': 'senha123',
         })
-        payload = {
+        res = self._post_assistente({
             'habito_id': self.habito_negativo.id,
-            'frequencia_atual': 5,
-            'periodo': 'dia',
-            'nivel': 'confortavel',
-        }
-        res = self.client.post(
-            reverse('assistente_sugerir_meta'),
-            data=json.dumps(payload),
-            content_type='application/json',
-        )
+            'mensagem': 'Quero parar',
+        })
         self.assertEqual(res.status_code, 400)
-        data = res.json()
-        self.assertFalse(data['sucesso'])
-        self.assertIn('positivos', data['erro'])
+        self.assertIn('positivos', res.json()['erro'])
 
     def test_habito_com_meta_existente_rejeitado(self):
         self.client.post(reverse('login'), {
             'email': self.cliente.email,
             'password': 'senha123',
         })
-        payload = {
+        res = self._post_assistente({
             'habito_id': self.habito_com_meta.id,
-            'frequencia_atual': 1,
-            'periodo': 'dia',
-            'nivel': 'confortavel',
-        }
-        res = self.client.post(
-            reverse('assistente_sugerir_meta'),
-            data=json.dumps(payload),
-            content_type='application/json',
-        )
+            'mensagem': 'Quero evoluir',
+        })
         self.assertEqual(res.status_code, 400)
-        data = res.json()
-        self.assertFalse(data['sucesso'])
-        self.assertIn('já possui uma meta', data['erro'])
+        self.assertIn('já possui uma meta', res.json()['erro'])
 
-    def test_frequencia_atual_zero_ou_negativa_rejeitada(self):
+    def test_mensagem_vazia_rejeitada(self):
         self.client.post(reverse('login'), {
             'email': self.cliente.email,
             'password': 'senha123',
         })
-        for freq in (0, -2):
-            with self.subTest(freq=freq):
-                payload = {
-                    'habito_id': self.habito_positivo.id,
-                    'frequencia_atual': freq,
-                    'periodo': 'semana',
-                    'nivel': 'equilibrada',
-                }
-                res = self.client.post(
-                    reverse('assistente_sugerir_meta'),
-                    data=json.dumps(payload),
-                    content_type='application/json',
-                )
-                self.assertEqual(res.status_code, 400)
-                data = res.json()
-                self.assertFalse(data['sucesso'])
+        res = self._post_assistente({
+            'habito_id': self.habito_positivo.id,
+            'mensagem': '   ',
+        })
+        self.assertEqual(res.status_code, 400)
 
     def test_assistente_nao_cria_meta_no_banco(self):
         self.client.post(reverse('login'), {
@@ -620,18 +676,11 @@ class MetaAssistantEndpointTest(TestCase):
             'password': 'senha123',
         })
         metas_antes = Meta.objects.count()
-        payload = {
+        res = self._post_assistente({
             'habito_id': self.habito_positivo.id,
-            'frequencia_atual': 3,
-            'periodo': 'semana',
-            'nivel': 'desafiadora',
-            'objetivo_texto': 'Quero evoluir sem exagerar.',
-        }
-        res = self.client.post(
-            reverse('assistente_sugerir_meta'),
-            data=json.dumps(payload),
-            content_type='application/json',
-        )
+            'mensagem': 'Quero evoluir sem exagerar.',
+            'historico': [],
+        })
         self.assertEqual(res.status_code, 200)
         self.assertEqual(Meta.objects.count(), metas_antes)
 
@@ -640,25 +689,16 @@ class MetaAssistantEndpointTest(TestCase):
             'email': self.cliente.email,
             'password': 'senha123',
         })
-        payload = {
+        res = self._post_assistente({
             'habito_id': self.habito_positivo.id,
-            'frequencia_atual': 2,
-            'periodo': 'semana',
-            'nivel': 'equilibrada',
-            'objetivo_texto': 'Quero ler mais durante a semana.',
-        }
-        res = self.client.post(
-            reverse('assistente_sugerir_meta'),
-            data=json.dumps(payload),
-            content_type='application/json',
-        )
+            'mensagem': 'Quero ler mais durante a semana.',
+        })
         self.assertEqual(res.status_code, 200)
-        # Nenhum campo de Meta/Habito deve guardar o texto livre
         for meta in Meta.objects.all():
             serializado = json.dumps(meta.__dict__, default=str)
             self.assertNotIn('Quero ler mais', serializado)
 
-    def test_tela_de_metas_contem_botao_e_dados_iniciais_do_assistente(self):
+    def test_tela_de_metas_contem_chat_do_assistente(self):
         self.client.post(reverse('login'), {
             'email': self.cliente.email,
             'password': 'senha123',
@@ -667,13 +707,14 @@ class MetaAssistantEndpointTest(TestCase):
         self.assertEqual(res.status_code, 200)
         self.assertContains(res, 'Me ajude a criar uma meta')
         self.assertContains(res, 'assistente-modal')
-        self.assertContains(res, 'assistant-objetivo')
+        self.assertContains(res, 'assistant-chat-log')
+        self.assertContains(res, 'assistant-chat-input')
+        self.assertContains(res, 'O que você quer alcançar com esse hábito?')
         self.assertContains(res, 'Usar esta meta')
-        self.assertContains(res, 'assistant-plan')
-        self.assertContains(res, 'Plano sugerido')
-        self.assertContains(res, 'renderizarPlanoSugerido')
+        self.assertContains(res, 'Começar novamente')
+        self.assertContains(res, 'enviarMensagemAssistente')
+        self.assertContains(res, 'historicoAssistente')
         self.assertContains(res, f'data-freq-valor="{self.habito_positivo.frequencia_atual_valor}"')
-        self.assertContains(res, f'data-freq-periodo="{self.habito_positivo.frequencia_atual_periodo}"')
 
     def test_usar_esta_meta_preenche_apenas_campos_existentes(self):
         self.client.post(reverse('login'), {
@@ -681,39 +722,29 @@ class MetaAssistantEndpointTest(TestCase):
             'password': 'senha123',
         })
         res = self.client.get(reverse('metas'))
-        self.assertEqual(res.status_code, 200)
         conteudo = res.content.decode('utf-8')
-        # Botão continua mapeando só habito / quantidade / periodo
         self.assertIn('aplicarSugestaoNoFormulario', conteudo)
-        self.assertIn("getElementById('id_habito')", conteudo)
-        self.assertIn("getElementById('id_quantidade_minima')", conteudo)
-        self.assertIn("getElementById('id_periodo')", conteudo)
-        self.assertIn('sugestaoMetaAtual.quantidade_sugerida', conteudo)
-        self.assertIn('sugestaoMetaAtual.periodo', conteudo)
-        # Não tenta gravar campos do plano no formulário
-        self.assertNotIn("getElementById('id_plano')", conteudo)
-        self.assertNotIn('sugestaoMetaAtual.plano', conteudo.split('function aplicarSugestaoNoFormulario')[1].split('function ')[0])
+        bloco = conteudo.split('function aplicarSugestaoNoFormulario')[1].split('function ')[0]
+        self.assertIn("getElementById('id_habito')", bloco)
+        self.assertIn("getElementById('id_quantidade_minima')", bloco)
+        self.assertIn("getElementById('id_periodo')", bloco)
+        self.assertNotIn("getElementById('id_plano')", bloco)
+        self.assertNotIn('historicoAssistente', bloco)
 
-    def test_endpoint_fallback_responde_sem_plano(self):
+    def test_endpoint_fallback_responde_meta_pronta_sem_etapas(self):
         self.client.post(reverse('login'), {
             'email': self.cliente.email,
             'password': 'senha123',
         })
-        res = self.client.post(
-            reverse('assistente_sugerir_meta'),
-            data=json.dumps({
-                'habito_id': self.habito_positivo.id,
-                'frequencia_atual': 2,
-                'periodo': 'semana',
-                'nivel': 'equilibrada',
-            }),
-            content_type='application/json',
-        )
-        self.assertEqual(res.status_code, 200)
+        res = self._post_assistente({
+            'habito_id': self.habito_positivo.id,
+            'mensagem': 'Quero melhorar',
+        })
         data = res.json()
         self.assertTrue(data['sucesso'])
-        self.assertEqual(data.get('origem'), 'deterministico')
-        self.assertNotIn('plano', data)
+        self.assertEqual(data['estado'], 'meta_pronta')
+        self.assertEqual(data['origem'], 'deterministico')
+        self.assertNotIn('etapas', data)
         self.assertIn('quantidade_sugerida', data)
 
     def test_criacao_normal_compartilhamento_e_parceiro_continuam_intactos(self):
@@ -748,7 +779,7 @@ class MetaAssistantEndpointTest(TestCase):
 
 @override_settings(OPENAI_API_KEY='sk-test-fake-key-not-real', OPENAI_META_ASSISTANT_MODEL='gpt-test-model')
 class MetaAssistantEndpointIATest(TestCase):
-    """Endpoint com IA mockada: usa sugestão da API e nunca persiste Meta."""
+    """Endpoint com IA mockada no fluxo conversacional."""
 
     def setUp(self):
         self.cliente = Cliente.objects.create(
@@ -768,83 +799,95 @@ class MetaAssistantEndpointIATest(TestCase):
             frequencia_desejada_periodo='semana',
         )
 
-    @patch('openai.OpenAI')
-    def test_endpoint_usa_resposta_ia_valida_sem_criar_meta(self, mock_openai_cls):
-        client = MagicMock()
-        mock_openai_cls.return_value = client
-        client.responses.create.return_value = _resposta_ia_mock({
-            'quantidade_sugerida': 4,
-            'periodo': 'semana',
-            'nivel': 'equilibrada',
-            'mensagem': 'Leia 4 vezes por semana para evoluir com constância.',
-            'justificativa': 'Aumento gradual e sustentável.',
-            'plano': _plano_valido(),
-        })
-
+    def _login(self):
         self.client.post(reverse('login'), {
             'email': self.cliente.email,
             'password': 'senha123',
         })
+
+    @patch('openai.OpenAI')
+    def test_endpoint_retorna_coletando_contexto(self, mock_openai_cls):
+        client = MagicMock()
+        mock_openai_cls.return_value = client
+        client.responses.create.return_value = _resposta_ia_mock(
+            _resposta_coletando('Quantos livros você lê por ano hoje?')
+        )
+        self._login()
         metas_antes = Meta.objects.count()
         res = self.client.post(
             reverse('assistente_sugerir_meta'),
             data=json.dumps({
                 'habito_id': self.habito.id,
-                'frequencia_atual': 2,
-                'periodo': 'semana',
-                'nivel': 'equilibrada',
-                'objetivo_texto': 'Quero ler mais durante a semana.',
+                'mensagem': 'Quero ler mais',
+                'historico': [],
             }),
             content_type='application/json',
         )
         self.assertEqual(res.status_code, 200)
         data = res.json()
-        self.assertTrue(data['sucesso'])
-        self.assertEqual(data['origem'], 'ia')
-        self.assertEqual(data['quantidade_sugerida'], 4)
-        self.assertIn('plano', data)
-        self.assertEqual(len(data['plano']['etapas']), 3)
+        self.assertEqual(data['estado'], 'coletando_contexto')
+        self.assertIsNone(data['meta'])
+        self.assertIn('livros', data['mensagem'].lower())
+        self.assertEqual(Meta.objects.count(), metas_antes)
+
+    @patch('openai.OpenAI')
+    def test_endpoint_usa_meta_pronta_sem_criar_meta(self, mock_openai_cls):
+        client = MagicMock()
+        mock_openai_cls.return_value = client
+        client.responses.create.return_value = _resposta_ia_mock(_resposta_meta_pronta(
+            titulo_meta='Ler 12 livros no ano',
+            quantidade_sugerida=1,
+        ))
+        self._login()
+        metas_antes = Meta.objects.count()
+        res = self.client.post(
+            reverse('assistente_sugerir_meta'),
+            data=json.dumps({
+                'habito_id': self.habito.id,
+                'mensagem': 'Em dois meses',
+                'historico': [
+                    {'role': 'user', 'content': 'Quero ler 12 livros'},
+                    {'role': 'assistant', 'content': 'Qual seu ritmo atual?'},
+                    {'role': 'user', 'content': '4 por ano'},
+                    {'role': 'assistant', 'content': 'Tem prazo?'},
+                ],
+            }),
+            content_type='application/json',
+        )
+        data = res.json()
+        self.assertEqual(data['estado'], 'meta_pronta')
+        self.assertEqual(data['titulo_meta'], 'Ler 12 livros no ano')
+        self.assertEqual(data['quantidade_sugerida'], 1)
+        self.assertIn('etapas', data)
         self.assertEqual(Meta.objects.count(), metas_antes)
 
         kwargs = client.responses.create.call_args.kwargs
-        input_enviado = kwargs.get('input', '')
-        self.assertNotIn(self.cliente.email, input_enviado)
-        self.assertNotIn('senha123', input_enviado)
-        self.assertNotIn(self.cliente.nome_completo, input_enviado)
+        input_enviado = kwargs.get('input')
+        self.assertTrue(any('Quero ler 12 livros' in str(m.get('content', '')) for m in input_enviado))
+        blob = json.dumps(input_enviado)
+        self.assertNotIn(self.cliente.email, blob)
+        self.assertNotIn('senha123', blob)
+        self.assertNotIn(self.cliente.nome_completo, blob)
 
     @patch('openai.OpenAI')
     def test_plano_nao_e_persistido_no_banco(self, mock_openai_cls):
         client = MagicMock()
         mock_openai_cls.return_value = client
-        client.responses.create.return_value = _resposta_ia_mock({
-            'quantidade_sugerida': 3,
-            'periodo': 'semana',
-            'nivel': 'equilibrada',
-            'mensagem': 'Leia 3 vezes por semana.',
-            'justificativa': 'Avanço gradual.',
-            'plano': _plano_valido(
-                criterio_sucesso='Texto unico do plano XYZ123 nao deve ir ao banco.',
-            ),
-        })
-
-        self.client.post(reverse('login'), {
-            'email': self.cliente.email,
-            'password': 'senha123',
-        })
+        client.responses.create.return_value = _resposta_ia_mock(_resposta_meta_pronta(
+            criterio_sucesso='Texto unico do plano XYZ123 nao deve ir ao banco.',
+        ))
+        self._login()
         metas_antes = Meta.objects.count()
         res = self.client.post(
             reverse('assistente_sugerir_meta'),
             data=json.dumps({
                 'habito_id': self.habito.id,
-                'frequencia_atual': 2,
-                'periodo': 'semana',
-                'nivel': 'equilibrada',
+                'mensagem': 'Quero ler 12 livros no ano',
             }),
             content_type='application/json',
         )
-        self.assertEqual(res.status_code, 200)
         data = res.json()
-        self.assertIn('plano', data)
+        self.assertEqual(data['estado'], 'meta_pronta')
         self.assertEqual(Meta.objects.count(), metas_antes)
         for meta in Meta.objects.all():
             serializado = json.dumps(meta.__dict__, default=str)

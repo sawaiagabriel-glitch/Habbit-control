@@ -9,7 +9,7 @@ from django.utils import timezone
 from apps.login_cadastro_app.models import Parceiro
 from .access import get_cliente_from_session
 from .forms import MetaForm
-from .meta_assistant import sanitizar_objetivo_texto, sugerir_meta
+from .meta_assistant import conversar_meta_assistente, sanitizar_mensagem
 from .models import Habito, Meta
 from .services import atualizar_ciclos_meta, inicio_periodo, _proximo_inicio, _progresso_do_ciclo
 
@@ -197,10 +197,11 @@ def meta_publica(request, token):
 
 
 def assistente_sugerir_meta(request):
-    """Endpoint autenticado para sugerir Meta (IA com fallback determinístico).
+    """Endpoint autenticado para o assistente conversacional de Meta.
 
-    Aceita apenas POST via JSON ou formulário. Não altera e não cria registros
-    no banco de dados. O texto opcional ``objetivo_texto`` não é persistido.
+    Aceita POST JSON com ``habito_id``, ``mensagem`` e ``historico`` opcional.
+    Não altera nem cria registros no banco. Histórico/perguntas/plano não são
+    persistidos. A titularidade do hábito vem só da sessão do Cliente.
     """
     if request.method != 'POST':
         return JsonResponse({'sucesso': False, 'erro': 'Método não permitido.'}, status=405)
@@ -218,10 +219,12 @@ def assistente_sugerir_meta(request):
         data = request.POST
 
     habito_id = data.get('habito_id')
-    frequencia_atual = data.get('frequencia_atual')
-    periodo = data.get('periodo')
-    nivel = data.get('nivel')
-    objetivo_texto = sanitizar_objetivo_texto(data.get('objetivo_texto'))
+    # Compat: clientes antigos podem enviar objetivo_texto em vez de mensagem.
+    mensagem_bruta = data.get('mensagem')
+    if mensagem_bruta is None or str(mensagem_bruta).strip() == '':
+        mensagem_bruta = data.get('objetivo_texto')
+    mensagem = sanitizar_mensagem(mensagem_bruta)
+    historico = data.get('historico')
 
     if not habito_id:
         return JsonResponse({'sucesso': False, 'erro': 'Selecione um hábito para a meta.'}, status=400)
@@ -231,6 +234,7 @@ def assistente_sugerir_meta(request):
     except (TypeError, ValueError):
         return JsonResponse({'sucesso': False, 'erro': 'Identificador de hábito inválido.'}, status=400)
 
+    # Autorização exclusivamente por sessão + titularidade do hábito.
     habito = Habito.objects.filter(pk=habito_id_int, cliente=cliente).first()
     if habito is None:
         return JsonResponse({'sucesso': False, 'erro': 'Hábito não encontrado ou não pertence à sua conta.'}, status=404)
@@ -241,23 +245,18 @@ def assistente_sugerir_meta(request):
     if habito.metas.exists():
         return JsonResponse({'sucesso': False, 'erro': 'Este hábito já possui uma meta cadastrada.'}, status=400)
 
-    try:
-        frequencia_atual_int = int(frequencia_atual)
-    except (TypeError, ValueError):
-        return JsonResponse({'sucesso': False, 'erro': 'A frequência atual deve ser um número inteiro maior que zero.'}, status=400)
-
-    if frequencia_atual_int < 1:
-        return JsonResponse({'sucesso': False, 'erro': 'A frequência atual deve ser maior ou igual a 1.'}, status=400)
+    if not mensagem:
+        return JsonResponse({'sucesso': False, 'erro': 'Informe uma mensagem para o assistente.'}, status=400)
 
     try:
-        sugestao = sugerir_meta(
-            frequencia_atual=frequencia_atual_int,
-            nivel=nivel,
-            periodo=periodo,
+        sugestao = conversar_meta_assistente(
+            mensagem=mensagem,
+            historico=historico,
             nome_habito=habito.nome_habito,
+            frequencia_atual=habito.frequencia_atual_valor or 1,
+            periodo_habito=habito.frequencia_atual_periodo or 'semana',
             frequencia_desejada=habito.frequencia_desejada_valor,
             periodo_desejado=habito.frequencia_desejada_periodo,
-            objetivo_texto=objetivo_texto,
         )
     except ValueError as e:
         return JsonResponse({'sucesso': False, 'erro': str(e)}, status=400)
@@ -266,15 +265,30 @@ def assistente_sugerir_meta(request):
         'sucesso': True,
         'habito_id': habito.id,
         'nome_habito': habito.nome_habito,
-        'quantidade_sugerida': sugestao['quantidade_sugerida'],
-        'periodo': sugestao['periodo'],
-        'nivel': sugestao['nivel'],
-        'mensagem': sugestao['mensagem'],
+        'estado': sugestao.get('estado', 'meta_pronta'),
+        'mensagem': sugestao.get('mensagem', ''),
         'origem': sugestao.get('origem', 'deterministico'),
+        'meta': sugestao.get('meta'),
     }
-    if sugestao.get('justificativa'):
-        resposta['justificativa'] = sugestao['justificativa']
-    # Plano é orientação adicional da IA; nunca é persistido.
-    if sugestao.get('plano'):
-        resposta['plano'] = sugestao['plano']
+
+    # Campos flat quando a meta está pronta (facilitam "Usar esta meta" e testes).
+    if sugestao.get('estado') == 'meta_pronta' and isinstance(sugestao.get('meta'), dict):
+        meta = sugestao['meta']
+        for campo in (
+            'titulo_meta',
+            'objetivo_principal',
+            'quantidade_sugerida',
+            'periodo',
+            'nivel',
+            'justificativa',
+            'duracao_semanas',
+            'criterio_sucesso',
+            'plano_recuperacao',
+            'etapas',
+        ):
+            if meta.get(campo) is not None:
+                resposta[campo] = meta[campo]
+        if meta.get('mensagem') and not resposta.get('mensagem'):
+            resposta['mensagem'] = meta['mensagem']
+
     return JsonResponse(resposta)
