@@ -1,14 +1,16 @@
 # Python
 __pycache__/
 *.py[cod]
+*.pyc
 *.sqlite3
 
 # Django
-/staticfiles/
-/media/
+staticfiles/
+media/
 
 # Envs
 venv/
+.venv/
 .env
 
 # Outros

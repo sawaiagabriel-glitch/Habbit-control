@@ -63,9 +63,85 @@ Metas só podem ser associadas a hábitos positivos e cada hábito pode ter uma 
 
 ## Requisitos
 
-- Python 3.10 ou superior.
-- Dependências listadas em `requirements.txt`.
+- Python 3.10 ou superior. A imagem Docker usa Python 3.13, a mesma linha da versão usada no desenvolvimento atual.
+- Dependências listadas em `Habbit-Control/requirements.txt`.
+- Docker Desktop, apenas para a execução em contentor.
 - SQLite para desenvolvimento local. A aplicação também aceita uma URL de base de dados através de `DATABASE_URL`.
+
+## Executando com Docker
+
+Pré-requisito: Docker Desktop instalado.
+
+Na pasta do repositório clonado, entre na aplicação Django (onde estão `manage.py` e `docker-compose.yml`):
+
+```bash
+git clone https://github.com/sawaiagabriel-glitch/Habbit-control.git
+cd Habbit-control/Habbit-Control
+```
+
+Crie o ficheiro `.env` a partir do exemplo. Preencha `OPENAI_API_KEY` só na máquina local, se quiser o assistente com a OpenAI. Sem essa chave, o assistente usa o fallback determinístico. Não versione o `.env`.
+
+```bash
+# Linux/macOS
+cp .env.example .env
+```
+
+```powershell
+# Windows (PowerShell)
+Copy-Item .env.example .env
+```
+
+Depois:
+
+```bash
+docker compose up --build
+```
+
+A aplicação fica disponível em [http://localhost:8000](http://localhost:8000).
+
+Para parar e remover os contentores:
+
+```bash
+docker compose down
+```
+
+O banco SQLite é o ficheiro `db.sqlite3` na pasta `Habbit-Control`. O serviço `web` monta essa pasta em `/app`, por isso o ficheiro permanece no computador ao recriar o contentor.
+
+Para executar os testes:
+
+```bash
+docker compose run --rm web python manage.py test
+```
+
+## Executar sem Docker
+
+Na pasta `Habbit-Control`:
+
+```bash
+python -m venv .venv
+```
+
+Windows:
+
+```bat
+.venv\Scripts\activate
+```
+
+Linux/macOS:
+
+```bash
+source .venv/bin/activate
+```
+
+Depois:
+
+```bash
+pip install -r requirements.txt
+python manage.py migrate
+python manage.py runserver
+```
+
+A aplicação fica disponível em [http://127.0.0.1:8000](http://127.0.0.1:8000/).
 
 ## Sessão e proteção CSRF
 
@@ -160,6 +236,46 @@ python manage.py migrate
 Os ciclos vencidos são processados ao consultar metas, ao registar atividades e pelo comando `python manage.py atualizar_ciclos_metas`. Em produção, configure uma tarefa diária no agendador do ambiente para executar esse comando e fechar períodos mesmo quando ninguém acede à aplicação. O comando é idempotente: executar novamente não duplica ciclos nem incrementa o streak outra vez.
 
 O projeto usa sessões próprias para Cliente e Parceiro, em vez do modelo de utilizador nativo do Django. A separação das vistas e dos testes mantém essa decisão localizada e explícita.
+
+## Deploy no Railway
+
+O serviço Django fica na pasta `Habbit-Control`. O Railway precisa usar essa pasta como diretório raiz. O arranque de produção é `sh start.sh`: aplica as migrations existentes, recolhe os ficheiros estáticos e inicia o Gunicorn com `habit_control.wsgi:application`. O `runserver` e o `docker compose` continuam a ser apenas para desenvolvimento local. O `railway.json` pede o builder Nixpacks para o Railway não usar o Dockerfile local.
+
+O link público de uma meta já é montado com o esquema e o host do pedido (`request.scheme` e `request.get_host`). Com `SECURE_PROXY_SSL_HEADER`, o Railway faz esse link sair em HTTPS, por exemplo `https://DOMINIO/meta/publica/TOKEN/`.
+
+1. Faça commit e push da branch `dev` para o GitHub. Não inclua o ficheiro `.env`.
+2. Crie um projeto novo no Railway.
+3. Escolha **Deploy from GitHub Repo**.
+4. Selecione o repositório `Habbit-control`.
+5. No serviço da aplicação, abra **Settings** e defina **Root Directory** como `Habbit-Control` antes do primeiro deploy. Sem isso, o Railway não encontra `manage.py` nem `requirements.txt`.
+6. Adicione um serviço **PostgreSQL** ao mesmo projeto.
+7. No serviço da aplicação, confirme que a variável `DATABASE_URL` foi criada e aponta para esse PostgreSQL. Não copie o `db.sqlite3` local. O schema no PostgreSQL nasce das migrations já existentes, executadas no arranque.
+8. Configure as variáveis do serviço da aplicação:
+
+```text
+SECRET_KEY=<gerar um valor longo e aleatório>
+DEBUG=False
+OPENAI_API_KEY=<chave da sua conta, se quiser o assistente com a OpenAI>
+OPENAI_META_ASSISTANT_MODEL=gpt-4.1-mini
+OPENAI_META_ASSISTANT_TIMEOUT=15
+NIXPACKS_PYTHON_VERSION=3.13
+```
+
+`NIXPACKS_PYTHON_VERSION` alinha o build ao Python 3.13 usado no desenvolvimento. Sem `OPENAI_API_KEY`, o assistente continua no fallback local.
+
+9. Em **Settings → Networking → Generate Domain**, publique o domínio HTTPS.
+10. O Railway injeta `RAILWAY_PUBLIC_DOMAIN`. O código acrescenta esse domínio a `ALLOWED_HOSTS` e `https://` mais esse domínio a `CSRF_TRUSTED_ORIGINS`. Mesmo assim, depois de o domínio existir, pode fixar as variáveis à mão:
+
+```text
+ALLOWED_HOSTS=DOMINIO_DO_RAILWAY
+CSRF_TRUSTED_ORIGINS=https://DOMINIO_DO_RAILWAY
+```
+
+Use só o hostname em `ALLOWED_HOSTS`, sem `https://`. Em `CSRF_TRUSTED_ORIGINS`, inclua o `https://`.
+11. Faça redeploy depois de gravar as variáveis.
+12. Teste na URL pública: página inicial e login, cadastro, Dashboard, hábitos, atividade, metas, chatbot, partilha com Parceiro e o link público numa janela anónima.
+
+Sem `DATABASE_URL`, o projeto continua a usar o SQLite local. Com `DEBUG=True`, cookies e redirecionamento HTTPS permanecem adequados a `http://127.0.0.1:8000`.
 
 ## Documentação
 
